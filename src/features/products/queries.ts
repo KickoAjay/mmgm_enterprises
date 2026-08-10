@@ -5,11 +5,10 @@ import type { Database } from "@/types/supabase";
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 export type ProductListItem = ProductRow & { fabricName: string | null };
 
-// Homepage sections only need the fabric's name, and the hand-maintained
-// Database type (src/types/supabase.ts) doesn't model foreign-table
-// relationships for typed embedded selects — so this does a second lookup
-// query instead of `.select("*, fabrics(name)")`. Revisit once generated
-// types are available.
+// Homepage sections only need the fabric's name — this does a second
+// lookup query instead of `.select("*, fabrics(name)")`, since embedded
+// foreign-table selects need relationship metadata this hand-maintained
+// Database type doesn't model. Revisit once generated types are available.
 async function withFabricNames(
   products: ProductRow[],
 ): Promise<ProductListItem[]> {
@@ -28,7 +27,7 @@ async function withFabricNames(
   if (fabricIds.length > 0) {
     const { data: fabrics } = await supabase
       .from("fabrics")
-      .select<"id, name", { id: string; name: string }>("id, name")
+      .select("id, name")
       .in("id", fabricIds);
     for (const f of fabrics ?? []) fabricMap.set(f.id, f.name);
   }
@@ -93,9 +92,7 @@ export async function getShopByCategoryTiles(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("categories")
-    .select<"id, name, slug, image_url", CategoryTile>(
-      "id, name, slug, image_url",
-    )
+    .select("id, name, slug, image_url")
     .eq("is_active", true)
     .order("sort_order", { ascending: true })
     .limit(limit);

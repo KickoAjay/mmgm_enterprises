@@ -8,11 +8,16 @@ import type { ProductListItem } from "@/features/products/queries";
 // them up to the real cart/wishlist tables. The product detail link
 // (/sarees/[slug]) 404s until Phase 5 builds that route; that's expected
 // during phased development, not a bug.
-export function ProductCard({ product }: { product: ProductListItem }) {
+export function ProductCard({
+  product,
+}: {
+  product: ProductListItem & { isAvailable?: boolean | null };
+}) {
   const discount = discountPercent(
     product.original_price,
     product.selling_price,
   );
+  const soldOut = product.isAvailable === false;
 
   return (
     <div className="group flex flex-col">
@@ -31,7 +36,11 @@ export function ProductCard({ product }: { product: ProductListItem }) {
         >
           <Heart className="size-4" />
         </button>
-        {discount > 0 ? (
+        {soldOut ? (
+          <span className="text-meta absolute top-2 left-2 rounded-sm bg-foreground px-2 py-1 font-semibold text-background">
+            SOLD OUT
+          </span>
+        ) : discount > 0 ? (
           <span className="text-meta absolute top-2 left-2 rounded-sm bg-primary px-2 py-1 font-semibold text-primary-foreground">
             {discount}% OFF
           </span>
@@ -73,9 +82,10 @@ export function ProductCard({ product }: { product: ProductListItem }) {
 
       <button
         type="button"
-        className="text-meta mt-3 w-full border border-border py-2 font-semibold tracking-wide text-foreground uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:border-primary hover:text-primary"
+        disabled={soldOut}
+        className="text-meta mt-3 w-full border border-border py-2 font-semibold tracking-wide text-foreground uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-0 disabled:group-hover:opacity-50 disabled:hover:border-border disabled:hover:text-foreground"
       >
-        Quick Add
+        {soldOut ? "Sold Out" : "Quick Add"}
       </button>
     </div>
   );

@@ -39,12 +39,14 @@ in Phase 2). See the migration file's header comment for full conventions.
 
 `products` columns map directly to spec §16: `sku`, `category_id`,
 `fabric_id`, `material_id`, `brand`, `description`, `short_description`,
-`original_price`, `selling_price`, `discount_amount` (percentage computed at
-write time, not stored redundantly), `saree_length_meters`,
+`original_price`, `selling_price`, `discount_amount`, `saree_length_meters`,
 `blouse_piece_included`, `blouse_length_meters`, `primary_color_id`,
 `secondary_color_id`, `pattern_id`, `design`, `border_type`, `border_color`,
 `pallu_type`, `work_type`, `weave_type`, `wash_care`, `country_of_origin`,
-`weight_grams`, `return_eligible`, `return_period_days`, `status`.
+`weight_grams`, `return_eligible`, `return_period_days`, `status`. A Phase 4
+migration adds `discount_percent` as a **stored generated column**
+(`round(((original_price - selling_price) / original_price) * 100)`), used
+by the catalog's Discount filter and "Biggest Discount" sort.
 
 ## Inventory
 
@@ -52,6 +54,12 @@ write time, not stored redundantly), `saree_length_meters`,
 | ------------------------ | ------------------------- | -------------------------------------------------------------------------------- |
 | `inventory`              | Current stock per product | `product_id` (unique FK), `quantity`, `reserved_quantity`, `low_stock_threshold` |
 | `inventory_transactions` | Stock change audit trail  | `change_type` enum, `quantity_delta`, `reference_order_id`                       |
+
+`inventory` itself stays admin-only (Phase 2 RLS) — exact stock counts are
+never exposed to the browser. The only public-facing read is the Phase 4
+`get_product_availability(uuid[])` SECURITY DEFINER function, which returns
+just `(product_id, is_available)` for the catalog's Availability filter and
+"Sold Out" badges.
 
 ## Cart & Wishlist
 

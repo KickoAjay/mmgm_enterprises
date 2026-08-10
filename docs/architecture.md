@@ -468,5 +468,44 @@ on banners/badges/promo sections only:
   sarees (no lorem ipsum, no images). Re-run it (or the equivalent
   service-role inserts) against any fresh project.
 - Wishlist/cart buttons on product cards are visual-only until Phase 6;
-  nav links to not-yet-built routes (`/shop`, `/sarees`, `/cart`, etc.) 404
-  until their respective phases — expected during phased development.
+  nav links to not-yet-built routes (`/cart`, `/account/wishlist`, product
+  detail pages, etc.) 404 until their respective phases — expected during
+  phased development. `/shop` and `/sarees` are real as of Phase 4 (§19).
+
+## 19. Saree Catalog + Search + Filters (implemented in Phase 4)
+
+- `/sarees` (`src/app/(store)/sarees/page.tsx`) is the single canonical
+  catalog implementation; `/shop` is a thin redirect that preserves query
+  params (spec §17 requires both routes to exist, without further
+  distinguishing them). All nav/footer links to either route work.
+- Filter/sort/search state lives entirely in the URL — `q`, `category`,
+  `fabric`, `color`, `pattern`, `occasion` (comma-separated multi-select),
+  `price`, `discount`, `availability`, `sort`, `page`. Every filter renders
+  as a plain `<Link>` (`src/components/store/catalog/filter-sidebar.tsx`)
+  built by `src/features/products/catalog-url.ts` — shareable/bookmarkable
+  URLs, and filtering works without client JS except the Sort `<select>`
+  (`catalog-sort.tsx`, the one genuinely interactive control) and the
+  mobile filter drawer (`mobile-filter-drawer.tsx`, a client wrapper around
+  the same server-rendered `FilterSidebar`).
+- Query building (`src/features/products/catalog.ts`, `getCatalogPage`):
+  - Fabric/pattern are plain `.in()` filters; Color matches primary OR
+    secondary color via `.or()`; Occasion is a many-to-many join
+    (`product_occasions`) resolved to product IDs first.
+  - Search (`q`) matches spec §20's own "red silk" example: free-text
+    ilike against name/description/SKU, **plus** resolving each word
+    against fabric/color/pattern/category names and matching products by
+    those IDs. Autocomplete, recent searches, and trending searches are
+    explicitly deferred — out of scope for this phase.
+  - Discount filter and "Biggest Discount" sort use a new
+    `products.discount_percent` **generated column** (Phase 4 migration)
+    rather than computing percentages per row in application code.
+  - Availability filter/badges route through a new SECURITY DEFINER RPC,
+    `get_product_availability(uuid[])`, rather than selecting from
+    `inventory` directly (still admin-only per Phase 2's RLS). Because
+    availability isn't a filterable column on `products`, that filter uses
+    a capped candidate-fetch-then-JS-filter approach instead of DB-level
+    pagination — documented as a scale caveat in the code, fine at this
+    catalog's size.
+- `docs/database-schema.md` and the Phase 1 migration file predate
+  `discount_percent` and `get_product_availability` — see
+  `supabase/migrations/20260810140000_phase4_catalog.sql` for both.
