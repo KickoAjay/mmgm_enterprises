@@ -1,5 +1,5 @@
 -- ============================================================================
--- YMGM Enterprises — Phase 1 initial schema
+-- MMGM Enterprises — Phase 1 initial schema
 --
 -- Scope: full table/enum/index/constraint DDL for the saree e-commerce
 -- platform described in docs/original-spec.md. This migration does NOT
@@ -221,7 +221,7 @@ create table products (
   category_id uuid references categories(id) on delete restrict,
   fabric_id uuid references fabrics(id) on delete restrict,
   material_id uuid references materials(id) on delete restrict,
-  brand text not null default 'YMGM Enterprises',
+  brand text not null default 'MMGM Enterprises',
   description text,
   short_description text,
 

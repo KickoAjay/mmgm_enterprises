@@ -1,3 +1,8 @@
+> **Brand name correction:** the brand is **MMGM Enterprises**, not "YMGM
+> Enterprises" as written throughout the spec below. This file is preserved
+> verbatim as originally provided; every other file in this project (code,
+> other docs, seed data, UI copy) uses the corrected "MMGM Enterprises" name.
+
 # MASTER PROMPT — YMGM ENTERPRISES
 
 # PREMIUM FASHION-STYLE SAREE E-COMMERCE WEBSITE

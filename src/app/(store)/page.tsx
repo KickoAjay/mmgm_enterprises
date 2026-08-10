@@ -28,7 +28,7 @@ export default function Home() {
         className="flex flex-col items-center"
       >
         <span className="text-meta font-semibold tracking-[0.2em] text-primary uppercase">
-          YMGM Enterprises
+          MMGM Enterprises
         </span>
 
         <h1 className="mt-6 font-serif text-hero text-foreground">

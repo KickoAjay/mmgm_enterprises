@@ -48,7 +48,7 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
-  /* YMGM brand accents — secondary fashion colors, used sparingly on
+  /* MMGM brand accents — secondary fashion colors, used sparingly on
      banners, badges, and promotional sections (plan.md §4) */
   --color-brand-burgundy: var(--brand-burgundy);
   --color-brand-rose: var(--brand-rose);
@@ -118,7 +118,7 @@
   --brand-champagne: #c9a66b;
 }
 
-/* Dark mode is not in scope for the YMGM design (plan.md has no dark-mode
+/* Dark mode is not in scope for the MMGM design (plan.md has no dark-mode
    requirement); this block is left inert on purpose. */
 .dark {
   --background: oklch(0.145 0 0);

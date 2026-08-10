@@ -16,9 +16,9 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "YMGM Enterprises | Premium Sarees for Every Occasion",
+  title: "MMGM Enterprises | Premium Sarees for Every Occasion",
   description:
-    "Discover timeless sarees curated for every occasion at YMGM Enterprises.",
+    "Discover timeless sarees curated for every occasion at MMGM Enterprises.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

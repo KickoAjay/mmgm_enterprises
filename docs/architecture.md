@@ -1,4 +1,4 @@
-# YMGM Enterprises — Architecture & Design System (Phase 1)
+# MMGM Enterprises — Architecture & Design System (Phase 1)
 
 Source spec: [`docs/original-spec.md`](./original-spec.md). This document is
 the Phase 1 deliverable required by that spec's §62 — architecture and
@@ -210,27 +210,55 @@ erDiagram
 | Return Eligibility / Period     | `return_eligible`, `return_period_days`               | boolean, integer                                              |
 | Product Status                  | `status`                                              | enum: DRAFT/ACTIVE/OUT_OF_STOCK/ARCHIVED                      |
 
-## 7. Authentication Architecture (flow only — implemented in Phase 2)
+## 7. Authentication Architecture (implemented in Phase 2)
 
 ```mermaid
 flowchart LR
   A[Customer submits\nlogin/register form] --> B[Supabase Auth]
-  B -->|session| C[Next.js middleware/\nServer Component reads session]
-  C --> D[users / profiles tables\nmirror auth identity]
-  C --> E{Is admin_users row\nlinked to this user?}
-  E -->|yes| F[Resolve role via\nroles/role_permissions]
-  E -->|no| G[Treat as customer]
+  B -->|session cookie| C[src/proxy.ts\nrefreshes session every request]
+  B -->|AFTER INSERT trigger| D[public.users / public.profiles\nmirror auth identity]
+  E[Server Component /\nServer Action] -->|getCurrentUser / requireUser| B
+  E --> F{admin_users row\nlinked to this user?}
+  F -->|yes| G[requireAdmin — broad check now,\nfine-grained roles in Phase 11]
+  F -->|no| H[Treat as customer]
 ```
 
-Session handling uses Supabase's cookie-based auth helpers for Next.js.
+Implementation:
+
+- `src/lib/db/client.ts` / `server.ts` — anon-key Supabase clients (browser /
+  Server Component & Action), subject to RLS.
+- `src/lib/db/service.ts` — service-role client that bypasses RLS; used only
+  for server-computed writes (orders, payments, webhooks, guest carts) —
+  never imported into a Client Component.
+- `src/proxy.ts` (Next.js 16's `middleware` → `proxy` convention) calls
+  `updateSession()` on every request to keep the session cookie fresh —
+  required because Server Components can't write cookies themselves.
+- `supabase/migrations/20260810130000_phase2_auth_and_rls.sql` — an
+  `AFTER INSERT ON auth.users` trigger mirrors new signups into
+  `public.users`/`public.profiles`, and an `AFTER UPDATE` trigger flips
+  `users.is_email_verified` once Supabase confirms the email.
+- Pages: `/register`, `/login`, `/forgot-password`, `/reset-password`,
+  `/verify-email`, plus `/auth/callback` (exchanges the PKCE code from
+  Supabase's email links for a session). Forms use React's
+  `useActionState` bound directly to Server Actions in
+  `src/lib/auth/actions.ts`. Validation: `src/validations/auth.ts` (Zod).
+- `src/lib/auth/session.ts` — `getCurrentUser()`, `requireUser()`,
+  `getAdminMembership()`, `requireAdmin()`.
+- Google OAuth (spec §25, optional) is deferred — email/password only for
+  now.
+
 RBAC role resolution happens server-side on every admin request — never
-trust a client-supplied role.
+trust a client-supplied role. Google OAuth is deferred (spec §25 lists it
+as optional); email/password is the only method wired up in Phase 2.
 
 ## 8. Admin RBAC
 
-Six roles (seeded in the Phase 1 migration, permissions assigned in Phase
-2): `SUPER_ADMIN`, `ADMIN`, `ORDER_MANAGER`, `PRODUCT_MANAGER`,
-`INVENTORY_MANAGER`, `CUSTOMER_SUPPORT`.
+Six roles (seeded in the Phase 1 migration): `SUPER_ADMIN`, `ADMIN`,
+`ORDER_MANAGER`, `PRODUCT_MANAGER`, `INVENTORY_MANAGER`,
+`CUSTOMER_SUPPORT`. Phase 2 wires up a broad `public.is_admin()` /
+`requireAdmin()` check (any active `admin_users` row); per-role permission
+enforcement (`role_permissions`) is refined in Phase 11 when the admin
+dashboard is built.
 
 | Role              | Primary scope                                       |
 | ----------------- | --------------------------------------------------- |
