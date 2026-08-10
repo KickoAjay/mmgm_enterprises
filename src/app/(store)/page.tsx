@@ -1,71 +1,81 @@
-"use client";
+import { HeroBanner } from "@/components/store/home/hero-banner";
+import { ShopByCategory } from "@/components/store/home/shop-by-category";
+import { ProductCarousel } from "@/components/store/home/product-carousel";
+import { ProductGrid } from "@/components/store/home/product-grid";
+import { EditorialBanner } from "@/components/store/home/editorial-banner";
+import { OffersSection } from "@/components/store/home/offers-section";
+import {
+  getTrendingNow,
+  getNewArrivals,
+  getBestSellers,
+} from "@/features/products/queries";
 
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
+export default async function Home() {
+  const [trending, newArrivals, bestSellers] = await Promise.all([
+    getTrendingNow(),
+    getNewArrivals(),
+    getBestSellers(),
+  ]);
 
-const ACCENTS = [
-  { name: "Burgundy", className: "bg-brand-burgundy" },
-  { name: "Rose", className: "bg-brand-rose" },
-  { name: "Dusty Pink", className: "bg-brand-dusty-pink" },
-  { name: "Emerald", className: "bg-brand-emerald" },
-  { name: "Mustard", className: "bg-brand-mustard" },
-  { name: "Terracotta", className: "bg-brand-terracotta" },
-  { name: "Plum", className: "bg-brand-plum" },
-  { name: "Champagne Gold", className: "bg-brand-champagne" },
-];
-
-// Phase 1 scaffold placeholder — proves fonts, design tokens, shadcn/ui,
-// and Framer Motion are wired correctly. The real homepage (hero banner,
-// category tiles, trending/new-arrivals carousels, editorial banners) is
-// built in Phase 3.
-export default function Home() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center px-6 py-24 text-center">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        className="flex flex-col items-center"
-      >
-        <span className="text-meta font-semibold tracking-[0.2em] text-primary uppercase">
-          MMGM Enterprises
-        </span>
+    <main>
+      <HeroBanner />
+      <ShopByCategory />
 
-        <h1 className="mt-6 font-serif text-hero text-foreground">
-          Elegance Woven Into Every Thread
-        </h1>
+      <ProductCarousel title="Trending Now" products={trending} />
 
-        <p className="mt-4 max-w-md text-muted-foreground">
-          Discover timeless sarees curated for every occasion.
-        </p>
+      <EditorialBanner
+        eyebrow="The Silk Edit"
+        title="Timeless Silk, Woven for Unforgettable Occasions"
+        description="Explore our curated edit of pure and blended silk sarees, crafted for weddings and festive celebrations."
+        ctaLabel="Explore Silk"
+        ctaHref="/shop?fabric=silk"
+        seed="edit-silk"
+      />
 
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Button size="lg" className="px-6 tracking-wide uppercase">
-            Shop Sarees
-          </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            className="px-6 tracking-wide uppercase"
-          >
-            Explore Collections
-          </Button>
-        </div>
+      <ProductGrid title="New Arrivals" products={newArrivals} />
 
-        <div className="mt-16 flex flex-wrap items-center justify-center gap-4">
-          {ACCENTS.map((accent) => (
-            <div key={accent.name} className="flex flex-col items-center gap-2">
-              <span
-                className={`size-6 rounded-full border border-border ${accent.className}`}
-                aria-hidden
-              />
-              <span className="text-meta text-muted-foreground">
-                {accent.name}
-              </span>
-            </div>
-          ))}
-        </div>
-      </motion.div>
+      <EditorialBanner
+        eyebrow="Wedding Edit"
+        title="Bridal Elegance, Reimagined"
+        description="From Kanchipuram silks to Banarasi brocades — sarees made for your biggest day."
+        ctaLabel="Explore Wedding"
+        ctaHref="/shop?category=wedding-sarees"
+        seed="edit-wedding"
+        reverse
+      />
+
+      <EditorialBanner
+        eyebrow="Festive Edit"
+        title="Dressed for Every Celebration"
+        description="Vibrant traditional weaves and zari work, ready for festival mornings and evening pujas alike."
+        ctaLabel="Explore Festive"
+        ctaHref="/shop?category=festive"
+        seed="edit-festive"
+      />
+
+      <ProductGrid title="Best Sellers" products={bestSellers} />
+
+      <EditorialBanner
+        eyebrow="Handloom Edit"
+        title="Crafted by Hand, Worn with Pride"
+        description="Celebrate India's weaving heritage with our handloom saree collection."
+        ctaLabel="Explore Handloom"
+        ctaHref="/shop?category=handloom"
+        seed="edit-handloom"
+        reverse
+      />
+
+      <EditorialBanner
+        eyebrow="Everyday Elegance"
+        title="Sarees for Office, Errands & Everything Between"
+        description="Breathable cottons and linens designed for effortless everyday wear."
+        ctaLabel="Explore Daily Wear"
+        ctaHref="/shop?category=daily-wear"
+        seed="edit-everyday"
+      />
+
+      <OffersSection />
     </main>
   );
 }

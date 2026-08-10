@@ -433,3 +433,40 @@ on banners/badges/promo sections only:
   sidebar (spec §17, §46).
 - Mobile experiences are designed intentionally per breakpoint in later
   phases, not simply shrunk from desktop (spec §46).
+
+## 18. Homepage + Navigation (implemented in Phase 3)
+
+- `src/components/store/header.tsx` — announcement bar (rotating messages,
+  `announcement-bar.tsx`) that scrolls away, then a `sticky top-0` main row
+  (logo, desktop nav from `nav-links.ts`, search/wishlist/account/cart
+  icons). Account icon is auth-aware via `getCurrentUser()`. Mobile uses a
+  full-screen drawer (`mobile-nav.tsx`) behind a hamburger button.
+- `src/components/store/footer.tsx` — multi-column footer (Shop, Customer
+  Care, Policies, Follow Us, contact, payment methods) per spec §51.
+- Both are wired into `src/app/(store)/layout.tsx`, so every route in that
+  group (home, auth pages, and future shop/cart/account pages) shares them.
+- Homepage sections (`src/app/(store)/page.tsx` composing
+  `src/components/store/home/*`): hero banner, Shop by Category, Trending
+  Now (horizontal scroll), 5 editorial banners (Silk/Wedding/Festive/
+  Handloom/Everyday Elegance edits), New Arrivals + Best Sellers grids, and
+  an Offers section — matching spec §7–§13.
+- **No real product/category photography exists yet.** Every image slot
+  (`MediaPlaceholder`, `src/components/store/media-placeholder.tsx`) renders
+  a deterministic brand-colored gradient tile instead of a photo or a
+  mismatched stock image — the same seed (e.g. a product slug) always gets
+  the same gradient. Swap in real photography via `product_images.url` /
+  `categories.image_url` once available; no code changes needed beyond
+  replacing the placeholder with an `<Image>`.
+- Product data comes from `src/features/products/queries.ts`
+  (`getNewArrivals`, `getBestSellers`, `getTrendingNow`,
+  `getShopByCategoryTiles`) — public, RLS-governed reads via the anon
+  client, not the service-role client. "Best Sellers"/"Trending" fall back
+  to rating/recency ordering since there's no real order history yet.
+- Demo catalog data (spec §55) is seeded via
+  [`supabase/seed.sql`](../supabase/seed.sql) — 8 categories, 9 fabrics, 6
+  materials, 13 patterns, 16 colors, 6 occasions, and 12 realistic demo
+  sarees (no lorem ipsum, no images). Re-run it (or the equivalent
+  service-role inserts) against any fresh project.
+- Wishlist/cart buttons on product cards are visual-only until Phase 6;
+  nav links to not-yet-built routes (`/shop`, `/sarees`, `/cart`, etc.) 404
+  until their respective phases — expected during phased development.

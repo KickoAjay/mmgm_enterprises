@@ -1,4 +1,12 @@
-// Phase 1: passthrough layout. Phase 3 adds the shared Header/Footer here.
+import { Header } from "@/components/store/header";
+import { Footer } from "@/components/store/footer";
+
 export default function StoreLayout({ children }: LayoutProps<"/">) {
-  return children;
+  return (
+    <>
+      <Header />
+      {children}
+      <Footer />
+    </>
+  );
 }
