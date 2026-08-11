@@ -322,6 +322,38 @@ export type Database = {
         Update: { id?: string; wishlist_id?: string; product_id?: string };
         Relationships: [];
       };
+      reviews: {
+        Row: {
+          id: string;
+          product_id: string;
+          user_id: string;
+          order_item_id: string;
+          rating: number;
+          title: string | null;
+          body: string | null;
+          image_urls: string[];
+          is_verified_purchase: boolean;
+          is_featured: boolean;
+          status: "PENDING" | "APPROVED" | "REJECTED";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          user_id: string;
+          order_item_id: string;
+          rating: number;
+          title?: string | null;
+          body?: string | null;
+          image_urls?: string[];
+          is_verified_purchase?: boolean;
+          is_featured?: boolean;
+          status?: "PENDING" | "APPROVED" | "REJECTED";
+        };
+        Update: Partial<Database["public"]["Tables"]["reviews"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

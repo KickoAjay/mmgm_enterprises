@@ -562,3 +562,41 @@ yet, but cart/wishlist don't depend on them.
   cart/wishlist mutation so the Header's cart-count badge
   (`getCartItemCount()`) and the /cart, /account/wishlist pages themselves
   stay in sync — no client-side refetching needed.
+
+## 21. Product Details (implemented in Phase 5, after Phase 6)
+
+`/sarees/[slug]` (`src/app/(store)/sarees/[slug]/page.tsx`), built after
+cart/wishlist since neither depends on it, and product cards already
+linked here throughout Phases 3/4/6.
+
+- `src/features/products/detail.ts` — `getProductDetail(slug)` resolves
+  every FK (category, fabric, material, primary/secondary color, pattern,
+  occasions) to display names via the same lookup-query pattern as
+  elsewhere (no embedded selects); `getSimilarProducts` (same category,
+  falling back to same fabric); `getProductReviews` (approved only).
+- **Gallery**: no real photography exists yet, so `ProductGallery` falls
+  back to a single `MediaPlaceholder` with no thumbnail strip — showing
+  several identical placeholder "photos" would be dishonest. The real
+  multi-image/thumbnail/hover-swap experience (spec §15) activates
+  automatically once `product_images` rows exist; `next.config.ts` now
+  pre-allows `**.supabase.co` in `images.remotePatterns` so that doesn't
+  silently break when it happens.
+- **Reviews show no reviewer name** — RLS only lets a customer read their
+  own `users` row, not other reviewers', and there's no public-safe
+  display name to join against. Shows a "Verified Buyer" badge instead
+  (every review is a verified purchase by definition, spec §56.16). No
+  review submission form yet either — that needs a real `order_item_id`
+  from a completed order, which doesn't exist until Phase 7+9.
+- **Delivery pincode check** (`delivery-actions.ts`) validates format and
+  returns a generic estimate — there's no courier/serviceability
+  integration anywhere in this project's phases. Not a stand-in for real
+  order tracking (spec §30), which comes from admin-entered shipment data.
+- **Recently Viewed** is pure client-side (`localStorage`, no
+  `recently_viewed` table in the schema) — reads/writes a capped list on
+  mount, no server round trip. Prices shown are a snapshot from when each
+  product was last viewed, not live.
+- `ProductCarousel` (used for New Arrivals's sibling "Trending Now" on the
+  homepage) moved from `components/store/home/` to `components/store/`
+  now that Similar Sarees reuses it too.
+- Buy Now adds to cart then redirects straight to `/cart` — Phase 7
+  (Checkout) doesn't exist yet, so there's no dedicated buy-now flow.

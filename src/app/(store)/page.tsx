@@ -1,6 +1,6 @@
 import { HeroBanner } from "@/components/store/home/hero-banner";
 import { ShopByCategory } from "@/components/store/home/shop-by-category";
-import { ProductCarousel } from "@/components/store/home/product-carousel";
+import { ProductCarousel } from "@/components/store/product-carousel";
 import { ProductGrid } from "@/components/store/home/product-grid";
 import { EditorialBanner } from "@/components/store/home/editorial-banner";
 import { OffersSection } from "@/components/store/home/offers-section";
