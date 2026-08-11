@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { Heart, Search, ShoppingBag, User } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getCartItemCount } from "@/features/cart/queries";
 import { AnnouncementBar } from "@/components/store/announcement-bar";
 import { MobileNav } from "@/components/store/mobile-nav";
 import { NAV_LINKS } from "@/components/store/nav-links";
 
 export async function Header() {
-  const user = await getCurrentUser();
+  const [user, cartItemCount] = await Promise.all([
+    getCurrentUser(),
+    getCartItemCount(),
+  ]);
   const isLoggedIn = Boolean(user);
 
   return (
@@ -37,8 +41,8 @@ export async function Header() {
           </nav>
 
           <div className="flex items-center gap-4">
-            {/* Real search (autocomplete/suggestions) lands in Phase 4 —
-                for now this links straight to the browse page. */}
+            {/* Search box lives on /sarees itself (Phase 4); autocomplete/
+                recent/trending suggestions are explicitly deferred. */}
             <Link
               href="/sarees"
               aria-label="Search"
@@ -63,9 +67,14 @@ export async function Header() {
             <Link
               href="/cart"
               aria-label="Cart"
-              className="text-foreground transition-colors hover:text-primary"
+              className="relative text-foreground transition-colors hover:text-primary"
             >
               <ShoppingBag className="size-5" />
+              {cartItemCount > 0 ? (
+                <span className="text-meta absolute -top-2 -right-2 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                  {cartItemCount > 9 ? "9+" : cartItemCount}
+                </span>
+              ) : null}
             </Link>
           </div>
         </div>

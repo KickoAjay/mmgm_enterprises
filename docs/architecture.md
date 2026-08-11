@@ -509,3 +509,56 @@ on banners/badges/promo sections only:
 - `docs/database-schema.md` and the Phase 1 migration file predate
   `discount_percent` and `get_product_availability` — see
   `supabase/migrations/20260810140000_phase4_catalog.sql` for both.
+
+## 20. Cart + Wishlist (implemented in Phase 6, ahead of Phase 5)
+
+Built directly on the `ProductCard`s already live on the homepage/catalog
+(Quick Add, wishlist heart) — Phase 5's product detail pages don't exist
+yet, but cart/wishlist don't depend on them.
+
+- **Guest carts are real carts**, not deferred to login. `carts` has both
+  `user_id` (unique, logged-in) and `session_id` (guest) — Phase 2's RLS
+  only covers `user_id = auth.uid()`, so guest cart reads/writes go
+  through the service-role client instead, keyed by an httpOnly
+  `mmgm_cart_session` cookie
+  (`src/features/cart/cart-session.ts`). Splits into
+  `getCartContext()` (read-only, Server Component safe, never writes a
+  cookie — Next.js forbids that outside a Server Action) and
+  `getOrCreateCartContext()` (Server Action only, creates the cart/cookie
+  on first add).
+  - Known gap: no guest→user cart merge on login yet — a guest who adds
+    items then logs in gets a fresh, empty user cart. Worth fixing before
+    Phase 7 (Checkout) if guest checkout is expected to convert accounts
+    mid-flow.
+- **Cart totals are always computed from the live `products` row**, never
+  `cart_items.unit_price_snapshot` (spec §56.3) — the snapshot exists only
+  as a future "price changed since you added this" reference, unused so
+  far. Discount/shipping/tax are Phase 7's concern; the cart page shows
+  subtotal only.
+- **Stock enforcement** (spec §56.1/§56.2): `addToCartAction` /
+  `updateCartItemQuantityAction` read `inventory` through the service-role
+  client (still admin-only for direct browser reads) and clamp the
+  requested quantity to what's actually available, returning a message
+  rather than silently failing.
+- **Cross-cart-item ownership check**: because guest mutations use the
+  service-role client (bypasses RLS), `updateCartItemQuantityAction` /
+  `removeCartItemAction` verify the target `cart_items` row actually
+  belongs to the caller's own resolved `cartId` before touching it —
+  otherwise nothing would stop one guest session from mutating another's
+  cart item by guessing/observing an ID. Redundant-but-harmless for
+  logged-in carts, where RLS already enforces the same thing.
+- **Wishlist requires an account** (spec §24 lives under
+  `/account/wishlist`) — `toggleWishlistAction` returns
+  `{ requiresLogin: true }` for signed-out callers, and the client-side
+  `WishlistButton` redirects to `/login` on that response. No-duplicates
+  (spec §56.10) is enforced by the DB's unique `(wishlist_id, product_id)`
+  constraint, not just application logic.
+- **Wishlist heart state on listing pages is not prefetched** — checking
+  per-product membership on every card across the homepage/catalog would
+  mean an extra query per card, everywhere. `WishlistButton` starts
+  unfilled and reflects the real state once toggled; `/account/wishlist`
+  itself is always accurate since it's the source of truth.
+- Server Actions call `revalidatePath("/", "layout")` after any
+  cart/wishlist mutation so the Header's cart-count badge
+  (`getCartItemCount()`) and the /cart, /account/wishlist pages themselves
+  stay in sync — no client-side refetching needed.

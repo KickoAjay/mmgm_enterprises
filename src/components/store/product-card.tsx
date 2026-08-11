@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { Heart, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import { MediaPlaceholder } from "@/components/store/media-placeholder";
+import { WishlistButton } from "@/components/store/wishlist-button";
+import { AddToCartButton } from "@/components/store/add-to-cart-button";
 import { formatINR, discountPercent } from "@/features/products/format";
 import type { ProductListItem } from "@/features/products/queries";
 
-// Wishlist (heart) and Quick Add are visual-only for now — Phase 6 wires
-// them up to the real cart/wishlist tables. The product detail link
-// (/sarees/[slug]) 404s until Phase 5 builds that route; that's expected
-// during phased development, not a bug.
+// The product detail link (/sarees/[slug]) 404s until Phase 5 builds that
+// route; that's expected during phased development, not a bug.
 export function ProductCard({
   product,
 }: {
@@ -29,13 +29,7 @@ export function ProductCard({
             className="rounded-sm"
           />
         </Link>
-        <button
-          type="button"
-          aria-label="Add to wishlist"
-          className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full bg-background/90 text-foreground transition-colors hover:text-primary"
-        >
-          <Heart className="size-4" />
-        </button>
+        <WishlistButton productId={product.id} />
         {soldOut ? (
           <span className="text-meta absolute top-2 left-2 rounded-sm bg-foreground px-2 py-1 font-semibold text-background">
             SOLD OUT
@@ -80,13 +74,7 @@ export function ProductCard({
         </div>
       </div>
 
-      <button
-        type="button"
-        disabled={soldOut}
-        className="text-meta mt-3 w-full border border-border py-2 font-semibold tracking-wide text-foreground uppercase opacity-0 transition-opacity group-hover:opacity-100 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-0 disabled:group-hover:opacity-50 disabled:hover:border-border disabled:hover:text-foreground"
-      >
-        {soldOut ? "Sold Out" : "Quick Add"}
-      </button>
+      <AddToCartButton productId={product.id} soldOut={soldOut} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 // Hand-maintained partial Supabase Database type, covering only the tables
-// touched by Phase 2 (auth), Phase 3 (catalog reads for the homepage), and
-// Phase 4 (catalog filtering/search). This will be replaced by the output
+// touched by Phase 2 (auth), Phase 3 (catalog reads for the homepage),
+// Phase 4 (catalog filtering/search), and Phase 6 (cart/wishlist). This
+// will be replaced by the output
 // of `supabase gen types typescript` once the Supabase CLI is available in
 // this environment (see docs/architecture.md §7) — at that point, delete
 // this file's manual definitions and re-point imports at the generated
@@ -266,6 +267,59 @@ export type Database = {
           is_available?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["inventory"]["Insert"]>;
+        Relationships: [];
+      };
+      carts: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          session_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          session_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["carts"]["Insert"]>;
+        Relationships: [];
+      };
+      cart_items: {
+        Row: {
+          id: string;
+          cart_id: string;
+          product_id: string;
+          quantity: number;
+          unit_price_snapshot: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          cart_id: string;
+          product_id: string;
+          quantity: number;
+          unit_price_snapshot: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["cart_items"]["Insert"]>;
+        Relationships: [];
+      };
+      wishlists: {
+        Row: { id: string; user_id: string; created_at: string };
+        Insert: { id?: string; user_id: string };
+        Update: { id?: string; user_id?: string };
+        Relationships: [];
+      };
+      wishlist_items: {
+        Row: {
+          id: string;
+          wishlist_id: string;
+          product_id: string;
+          created_at: string;
+        };
+        Insert: { id?: string; wishlist_id: string; product_id: string };
+        Update: { id?: string; wishlist_id?: string; product_id?: string };
         Relationships: [];
       };
     };

@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/db/server";
 import type { Database } from "@/types/supabase";
+import { getAvailabilityMap } from "@/features/products/availability";
 import {
   PRICE_BANDS,
   PAGE_SIZE,
@@ -130,21 +131,6 @@ async function productIdsForOccasions(
     .select("product_id")
     .in("occasion_id", occasionIds);
   return [...new Set((data ?? []).map((r) => r.product_id))];
-}
-
-// The only public-facing read of stock status — routes through the
-// SECURITY DEFINER `get_product_availability` RPC (Phase 4 migration)
-// rather than selecting from `inventory` directly, which stays admin-only.
-async function getAvailabilityMap(
-  productIds: string[],
-): Promise<Map<string, boolean>> {
-  if (productIds.length === 0) return new Map();
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("get_product_availability", {
-    p_product_ids: productIds,
-  });
-  if (error) throw error;
-  return new Map((data ?? []).map((row) => [row.product_id, row.is_available]));
 }
 
 async function getFilterOptions(): Promise<FilterOptions> {
@@ -280,7 +266,10 @@ export async function getCatalogPage(
     );
     if (error) throw error;
     const candidates = data ?? [];
-    const availMap = await getAvailabilityMap(candidates.map((p) => p.id));
+    const availMap = await getAvailabilityMap(
+      supabase,
+      candidates.map((p) => p.id),
+    );
     const filtered = candidates.filter((p) => {
       const isAvailable = availMap.get(p.id) ?? true;
       return availability === "in-stock" ? isAvailable : !isAvailable;
@@ -302,7 +291,10 @@ export async function getCatalogPage(
   const fabricNameMap = new Map(
     filterOptions.fabrics.map((f) => [f.id, f.name]),
   );
-  const pageAvailability = await getAvailabilityMap(rows.map((p) => p.id));
+  const pageAvailability = await getAvailabilityMap(
+    supabase,
+    rows.map((p) => p.id),
+  );
   const items: CatalogProduct[] = rows.map((p) => ({
     ...p,
     fabricName: p.fabric_id ? (fabricNameMap.get(p.fabric_id) ?? null) : null,
