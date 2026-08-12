@@ -8,6 +8,18 @@ export const metadata = {
   title: "Order Confirmation | MMGM Enterprises",
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  PENDING_PAYMENT: "Payment Pending",
+  PAYMENT_CONFIRMED: "Payment Confirmed",
+  ORDER_CONFIRMED: "Order Confirmed",
+  PROCESSING: "Processing",
+  PACKED: "Packed",
+  SHIPPED: "Shipped",
+  OUT_FOR_DELIVERY: "Out for Delivery",
+  DELIVERED: "Delivered",
+  CANCELLED: "Cancelled",
+};
+
 export default async function OrderConfirmationPage({
   params,
 }: {
@@ -17,17 +29,32 @@ export default async function OrderConfirmationPage({
   const order = await getOrderConfirmation(orderId);
   if (!order) notFound();
 
+  const isPaid = order.status !== "PENDING_PAYMENT" && order.status !== "CANCELLED";
+
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
       <div className="border border-border p-8 text-center">
         <h1 className="font-serif text-section text-foreground">
-          Thank you for your order
+          {isPaid ? "Thank you for your order" : "Order Recorded"}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Order <span className="font-medium text-foreground">{order.orderNumber}</span> has
-          been recorded. We&apos;ll email {order.contactEmail ?? "you"} with next steps to
-          complete payment.
+          {isPaid ? (
+            <>
+              Order <span className="font-medium text-foreground">{order.orderNumber}</span> is
+              confirmed. We&apos;ll email {order.contactEmail ?? "you"} with updates.
+            </>
+          ) : (
+            <>
+              Order <span className="font-medium text-foreground">{order.orderNumber}</span> has
+              been recorded but payment hasn&apos;t completed yet.
+            </>
+          )}
         </p>
+        {!isPaid ? (
+          <Button asChild className="mt-4 uppercase tracking-wide">
+            <Link href={`/checkout/pay/${order.id}`}>Complete Payment</Link>
+          </Button>
+        ) : null}
       </div>
 
       <div className="mt-8 grid gap-8 sm:grid-cols-2">
@@ -53,7 +80,9 @@ export default async function OrderConfirmationPage({
           <h2 className="text-meta font-semibold tracking-wide text-foreground uppercase">
             Order Status
           </h2>
-          <p className="mt-3 text-sm text-foreground">Payment Pending</p>
+          <p className="mt-3 text-sm text-foreground">
+            {STATUS_LABELS[order.status] ?? order.status}
+          </p>
         </div>
       </div>
 

@@ -270,6 +270,43 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["inventory"]["Insert"]>;
         Relationships: [];
       };
+      inventory_transactions: {
+        Row: {
+          id: string;
+          product_id: string;
+          change_type:
+            | "RESTOCK"
+            | "SALE"
+            | "ADJUSTMENT"
+            | "RETURN"
+            | "RESERVATION"
+            | "RELEASE";
+          quantity_delta: number;
+          reason: string | null;
+          reference_order_id: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          change_type:
+            | "RESTOCK"
+            | "SALE"
+            | "ADJUSTMENT"
+            | "RETURN"
+            | "RESERVATION"
+            | "RELEASE";
+          quantity_delta: number;
+          reason?: string | null;
+          reference_order_id?: string | null;
+          created_by?: string | null;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["inventory_transactions"]["Insert"]
+        >;
+        Relationships: [];
+      };
       addresses: {
         Row: {
           id: string;
@@ -438,6 +475,27 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["payments"]["Insert"]>;
         Relationships: [];
       };
+      payment_transactions: {
+        Row: {
+          id: string;
+          payment_id: string;
+          cashfree_event_id: string;
+          event_type: string;
+          raw_payload: unknown;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          payment_id: string;
+          cashfree_event_id: string;
+          event_type: string;
+          raw_payload: unknown;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["payment_transactions"]["Insert"]
+        >;
+        Relationships: [];
+      };
       coupons: {
         Row: {
           id: string;
@@ -582,6 +640,14 @@ export type Database = {
       get_product_availability: {
         Args: { p_product_ids: string[] };
         Returns: { product_id: string; is_available: boolean }[];
+      };
+      // SECURITY DEFINER RPC (Phase 8 migration), service_role only —
+      // atomically marks a payment SUCCESS, confirms the order, and
+      // decrements inventory in one transaction. See
+      // src/features/payments/confirm.ts for the caller.
+      confirm_order_payment: {
+        Args: { p_cashfree_order_id: string; p_cashfree_payment_id?: string };
+        Returns: string;
       };
     };
   };

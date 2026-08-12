@@ -182,7 +182,7 @@ export async function placeOrderAction(
       billing_address_id: billingAddressId,
       placed_at: new Date().toISOString(),
     })
-    .select("id")
+    .select("id, order_number")
     .single();
   if (orderError) return { error: "Could not create your order. Please try again." };
 
@@ -206,11 +206,13 @@ export async function placeOrderAction(
     note: "Order placed",
   });
 
-  // No Cashfree integration yet (Phase 8) — this records the order and
-  // leaves it (and the payment row) pending rather than faking a
-  // successful charge.
+  // cashfree_order_id is set eagerly to our own order_number — that's
+  // what gets sent to Cashfree as *their* order_id once the payment page
+  // creates the session, and is how the webhook/return-page look this
+  // payment row back up.
   await supabase.from("payments").insert({
     order_id: order.id,
+    cashfree_order_id: order.order_number,
     amount: totals.grandTotal,
     status: "PENDING",
   });
@@ -228,5 +230,5 @@ export async function placeOrderAction(
     await supabase.from("cart_items").delete().eq("cart_id", cartId);
   }
 
-  redirect(`/checkout/confirmation/${order.id}`);
+  redirect(`/checkout/pay/${order.id}`);
 }

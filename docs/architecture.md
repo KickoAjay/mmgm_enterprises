@@ -604,11 +604,8 @@ linked here throughout Phases 3/4/6.
 ## 22. Checkout (implemented in Phase 7)
 
 `/checkout` (`src/app/(store)/checkout/page.tsx`) → `placeOrderAction`
-creates a real `PENDING_PAYMENT` order; `/checkout/confirmation/[orderId]`
-displays it. No Cashfree integration yet (Phase 8) — the "Payment" step is
-a "Place Order" button that records the order and leaves the `payments`
-row `PENDING` rather than faking a successful charge (spec §61 forbids
-fake payment success).
+creates a real `PENDING_PAYMENT` order and redirects into the Phase 8
+payment flow at `/checkout/pay/[orderId]`.
 
 - **Guest checkout required a schema fix.** Phase 1 made `orders.user_id`
   and `addresses.user_id` `NOT NULL`, which silently blocks the guest
@@ -651,7 +648,7 @@ fake payment success).
   availability check (boolean, from the Phase 4 RPC) blocks checkout if
   any line is out of stock, but `inventory.quantity`/`reserved_quantity`
   aren't decremented or reserved here — that happens on payment
-  confirmation once Phase 8 wires up the Cashfree webhook. Reserving
+  confirmation (Phase 8's `confirm_order_payment` SQL function). Reserving
   stock on every `PENDING_PAYMENT` order with no expiry/release mechanism
   would lock inventory indefinitely for orders that never pay; deferring
   to payment success is the standard pattern.
@@ -659,3 +656,84 @@ fake payment success).
   addresses book UI doesn't exist) — every checkout collects a fresh
   address, saved as an orphaned `addresses` row (`user_id` set for
   logged-in users, but not linked into any "my addresses" list yet).
+
+## 23. Cashfree Integration (implemented in Phase 8)
+
+Built with **no live Cashfree credentials in this environment** —
+`.env.local` only had the sandbox API URL placeholder, `CASHFREE_APP_ID`/
+`CASHFREE_SECRET_KEY`/`CASHFREE_WEBHOOK_SECRET` were empty. The user chose
+to have this written and typechecked against Cashfree's documented API
+shape now, untested against a live sandbox, rather than pause the build.
+**Re-verify every field/header name against the current Cashfree
+dashboard/docs the first time real credentials are added** (spec §28
+explicitly calls for using current official docs) — treat this
+integration as reviewed-not-verified until that pass happens.
+
+Flow (matches the spec §28 diagram exactly):
+
+```
+placeOrderAction (Phase 7)          → orders row PENDING_PAYMENT,
+                                       payments row PENDING with
+                                       cashfree_order_id = order_number
+  ↓ redirect
+/checkout/pay/[orderId]              → createCashfreeOrder() or reuse an
+                                        existing ACTIVE session
+  ↓ renders
+CashfreeCheckout (client)            → loads Cashfree's hosted checkout
+                                        JS SDK, redirects to Cashfree
+  ↓ customer pays, Cashfree redirects back
+/checkout/pay/[orderId]/return       → server-to-server status check,
+                                        confirmPayment() if PAID
+  ↓ (also, independently, whenever Cashfree sends it)
+/api/webhooks/cashfree                → verifies signature, confirmPayment()
+  ↓
+/checkout/confirmation/[orderId]      → shows the confirmed order
+```
+
+- **`confirmPayment()` is the single source of truth**
+  (`src/features/payments/confirm.ts`), and both the return page and the
+  webhook call it with the same arguments. It's a thin wrapper around
+  `confirm_order_payment(p_cashfree_order_id, p_cashfree_payment_id)`, a
+  `SECURITY DEFINER` SQL function (migration
+  `20260810160000_phase8_payments.sql`, **must be run in the Supabase SQL
+  Editor**) that does everything — mark the payment `SUCCESS`, move the
+  order to `ORDER_CONFIRMED`, write both `order_status_history` rows, and
+  decrement `inventory.quantity` + write `inventory_transactions` — inside
+  one transaction with `select ... for update` on the order row. That's
+  what makes it safe for the return page and the webhook to race each
+  other (spec §56.9 "duplicate webhooks must not create duplicate
+  orders", §56.8 "inventory must update safely"): whichever call arrives
+  first does the work, the second sees `status <> 'PENDING_PAYMENT'` and
+  exits as a no-op. Only `service_role` can execute the function — revoked
+  from `PUBLIC`, since it marks payments as paid.
+- **Webhook idempotency has a second layer**: `payment_transactions.
+  cashfree_event_id` is unique, and the webhook route
+  (`src/app/api/webhooks/cashfree/route.ts`) derives that id as a SHA-256
+  hash of the raw request body — a retried delivery resends identical
+  bytes, hashes to the same id, and the insert fails before any side
+  effect runs. (Cashfree may also send a dedicated event-id header; using
+  a content hash instead avoids depending on a header name that couldn't
+  be confirmed without live traffic to inspect.)
+- **Signature verification** (`src/lib/cashfree/webhook.ts`) reads the
+  *raw* request body via `request.text()` before any JSON parsing —
+  computing the HMAC over a re-serialized `JSON.parse` result can silently
+  produce different bytes than what Cashfree signed, which would make
+  verification flaky in a way that's hard to notice locally.
+- **Order creation is resumable, not re-triggered blindly.**
+  `/checkout/pay/[orderId]` first does a `GET` on the Cashfree order for
+  `order_number`; if it's already `ACTIVE` with a `payment_session_id`,
+  that session is reused (page refresh, back button) instead of calling
+  `POST /orders` again.
+- **Graceful degradation with no credentials configured**:
+  `isCashfreeConfigured()` gates the payment page — right now it always
+  renders the "online payment isn't connected yet" fallback instead of
+  attempting a Cashfree API call that would just fail. This is what makes
+  Phase 7's checkout flow still fully clickable end-to-end today.
+- **No confirmation email** — "SEND CONFIRMATION" is the last step of the
+  spec §28 flow diagram, but no email provider (Resend/SMTP) is configured
+  anywhere in this project yet. Left undone rather than faked; likely
+  belongs with the `notifications` table (spec §40) in a later phase.
+- Cashfree's checkout UI is loaded from `sdk.cashfree.com` via
+  `next/script` — this is Cashfree's actual PCI-compliant hosted payment
+  page, not something reproducible via an npm package, and is what their
+  own integration docs direct you to load.
