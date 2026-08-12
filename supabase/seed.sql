@@ -204,3 +204,11 @@ insert into inventory (product_id, quantity, low_stock_threshold, is_available)
 select id, 25, 5, true from products
 where sku like 'MMGM-%'
 on conflict (product_id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Demo coupon (Phase 7 checkout) — storewide, no product/category scoping
+-- ---------------------------------------------------------------------------
+
+insert into coupons (code, type, value, min_order_amount, max_discount_amount, per_user_limit, is_active) values
+  ('WELCOME10', 'PERCENTAGE', 10, 999, 500, 1, true)
+on conflict (code) do nothing;

@@ -7,6 +7,7 @@ export type CartLine = {
   productId: string;
   slug: string;
   name: string;
+  sku: string;
   fabricName: string | null;
   unitPrice: number;
   originalPrice: number;
@@ -64,6 +65,7 @@ export async function getCartSummary(): Promise<CartSummary> {
       productId: product.id,
       slug: product.slug,
       name: product.name,
+      sku: product.sku,
       fabricName: product.fabric_id
         ? (fabricNameMap.get(product.fabric_id) ?? null)
         : null,

@@ -598,5 +598,64 @@ linked here throughout Phases 3/4/6.
 - `ProductCarousel` (used for New Arrivals's sibling "Trending Now" on the
   homepage) moved from `components/store/home/` to `components/store/`
   now that Similar Sarees reuses it too.
-- Buy Now adds to cart then redirects straight to `/cart` — Phase 7
-  (Checkout) doesn't exist yet, so there's no dedicated buy-now flow.
+- Buy Now adds to cart then redirects straight to `/checkout` (updated once
+  Phase 7 shipped it).
+
+## 22. Checkout (implemented in Phase 7)
+
+`/checkout` (`src/app/(store)/checkout/page.tsx`) → `placeOrderAction`
+creates a real `PENDING_PAYMENT` order; `/checkout/confirmation/[orderId]`
+displays it. No Cashfree integration yet (Phase 8) — the "Payment" step is
+a "Place Order" button that records the order and leaves the `payments`
+row `PENDING` rather than faking a successful charge (spec §61 forbids
+fake payment success).
+
+- **Guest checkout required a schema fix.** Phase 1 made `orders.user_id`
+  and `addresses.user_id` `NOT NULL`, which silently blocks the guest
+  checkout spec §27 step 1 explicitly calls for — and Phase 6 already
+  built guest cart support anticipating it. Migration
+  `20260810150000_phase7_guest_checkout.sql` (**must be run in the
+  Supabase SQL Editor**, same as every prior DDL change) makes both
+  nullable, adds `orders.guest_email`/`guest_phone` with a
+  `chk_orders_user_or_guest` check, and makes `coupon_usage.user_id`
+  nullable so a guest order still counts against a coupon's global
+  `usage_limit` (just not `per_user_limit`, which is skipped for guests —
+  there's no account to track it against).
+- **All writes go through the service-role client**
+  (`src/features/checkout/actions.ts`), consistent with the RLS design
+  from Phase 2: `orders`/`order_items`/`payments`/`coupon_usage` have no
+  client-insert policy at all, by design — every total is server-computed,
+  never trusted from the client (spec §56.3).
+- **Order confirmation is read via an unguessable order ID, not RLS.** A
+  guest order has no `auth.uid()` for the existing "Users view own
+  orders" policy to match, so `getOrderConfirmation` reads with the
+  service-role client, and the order's UUID in the URL is the access
+  token — the same pattern most checkout confirmation pages use
+  (generated once, never listed, effectively unguessable). Logged-in
+  users' own order history is a `/account` page for a later phase, scoped
+  by RLS as normal.
+- **Pricing** (`src/features/checkout/pricing.ts`): free shipping ≥ ₹999
+  (matches the sitewide announcement-bar copy from Phase 3), else a flat
+  ₹99 shipping fee; GST modelled as a flat 5% rather than India's real
+  HSN-slab textile schedule (5%/12% by unit price) — an intentional
+  simplification, not an attempt at a tax engine.
+- **Coupons** (`src/features/checkout/coupon.ts`): validates code, active
+  flag, date window, `min_order_amount`, `usage_limit`, and
+  `per_user_limit` server-side, re-checked again at final order placement
+  (never trusts the client-side "Apply" preview). Per-product/category
+  coupon scoping (`coupon_products`/`coupon_categories`, tables exist but
+  unused) and the admin coupon management UI are Phase 12's job — every
+  coupon here applies storewide. One demo coupon is seeded: `WELCOME10`
+  (10% off, min ₹999, capped at ₹500).
+- **Inventory is not touched at order creation.** `getCartSummary`'s
+  availability check (boolean, from the Phase 4 RPC) blocks checkout if
+  any line is out of stock, but `inventory.quantity`/`reserved_quantity`
+  aren't decremented or reserved here — that happens on payment
+  confirmation once Phase 8 wires up the Cashfree webhook. Reserving
+  stock on every `PENDING_PAYMENT` order with no expiry/release mechanism
+  would lock inventory indefinitely for orders that never pay; deferring
+  to payment success is the standard pattern.
+- Address forms don't yet offer a saved-address picker (`/account`
+  addresses book UI doesn't exist) — every checkout collects a fresh
+  address, saved as an orphaned `addresses` row (`user_id` set for
+  logged-in users, but not linked into any "my addresses" list yet).

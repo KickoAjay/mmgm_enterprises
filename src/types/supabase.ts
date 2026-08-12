@@ -1,6 +1,7 @@
 // Hand-maintained partial Supabase Database type, covering only the tables
 // touched by Phase 2 (auth), Phase 3 (catalog reads for the homepage),
-// Phase 4 (catalog filtering/search), and Phase 6 (cart/wishlist). This
+// Phase 4 (catalog filtering/search), Phase 6 (cart/wishlist), and Phase 7
+// (checkout: addresses/orders/order_items/payments/coupons). This
 // will be replaced by the output
 // of `supabase gen types typescript` once the Supabase CLI is available in
 // this environment (see docs/architecture.md §7) — at that point, delete
@@ -267,6 +268,225 @@ export type Database = {
           is_available?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["inventory"]["Insert"]>;
+        Relationships: [];
+      };
+      addresses: {
+        Row: {
+          id: string;
+          // nullable since Phase 7 (supabase/migrations/20260810150000) —
+          // a guest checkout address has no owning user
+          user_id: string | null;
+          type: "SHIPPING" | "BILLING" | "BOTH";
+          full_name: string;
+          phone: string;
+          line1: string;
+          line2: string | null;
+          city: string;
+          state: string;
+          pincode: string;
+          country: string;
+          is_default: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          type?: "SHIPPING" | "BILLING" | "BOTH";
+          full_name: string;
+          phone: string;
+          line1: string;
+          line2?: string | null;
+          city: string;
+          state: string;
+          pincode: string;
+          country?: string;
+          is_default?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["addresses"]["Insert"]>;
+        Relationships: [];
+      };
+      orders: {
+        Row: {
+          id: string;
+          order_number: string;
+          user_id: string | null;
+          status:
+            | "PENDING_PAYMENT"
+            | "PAYMENT_CONFIRMED"
+            | "ORDER_CONFIRMED"
+            | "PROCESSING"
+            | "PACKED"
+            | "SHIPPED"
+            | "OUT_FOR_DELIVERY"
+            | "DELIVERED"
+            | "CANCELLED"
+            | "RETURN_REQUESTED"
+            | "RETURN_APPROVED"
+            | "RETURN_PICKUP"
+            | "RETURNED"
+            | "REFUND_INITIATED"
+            | "REFUND_COMPLETED"
+            | "EXCHANGE_REQUESTED";
+          subtotal: number;
+          product_discount: number;
+          coupon_id: string | null;
+          coupon_discount: number;
+          shipping_fee: number;
+          tax_amount: number;
+          grand_total: number;
+          shipping_address_id: string | null;
+          billing_address_id: string | null;
+          // guest checkout (Phase 7) — set together with a null user_id,
+          // enforced by chk_orders_user_or_guest
+          guest_email: string | null;
+          guest_phone: string | null;
+          placed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_number: string;
+          user_id?: string | null;
+          status?: Database["public"]["Tables"]["orders"]["Row"]["status"];
+          subtotal: number;
+          product_discount?: number;
+          coupon_id?: string | null;
+          coupon_discount?: number;
+          shipping_fee?: number;
+          tax_amount?: number;
+          grand_total: number;
+          shipping_address_id?: string | null;
+          billing_address_id?: string | null;
+          guest_email?: string | null;
+          guest_phone?: string | null;
+          placed_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["orders"]["Insert"]>;
+        Relationships: [];
+      };
+      order_items: {
+        Row: {
+          id: string;
+          order_id: string;
+          product_id: string;
+          product_name_snapshot: string;
+          sku_snapshot: string;
+          unit_price: number;
+          quantity: number;
+          discount_amount: number;
+          line_total: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          product_id: string;
+          product_name_snapshot: string;
+          sku_snapshot: string;
+          unit_price: number;
+          quantity: number;
+          discount_amount?: number;
+          line_total: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["order_items"]["Insert"]>;
+        Relationships: [];
+      };
+      order_status_history: {
+        Row: {
+          id: string;
+          order_id: string;
+          status: Database["public"]["Tables"]["orders"]["Row"]["status"];
+          note: string | null;
+          changed_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          status: Database["public"]["Tables"]["orders"]["Row"]["status"];
+          note?: string | null;
+          changed_by?: string | null;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["order_status_history"]["Insert"]
+        >;
+        Relationships: [];
+      };
+      payments: {
+        Row: {
+          id: string;
+          order_id: string;
+          cashfree_order_id: string | null;
+          amount: number;
+          currency: string;
+          status: "PENDING" | "SUCCESS" | "FAILED" | "CANCELLED" | "REFUNDED";
+          method: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          cashfree_order_id?: string | null;
+          amount: number;
+          currency?: string;
+          status?: "PENDING" | "SUCCESS" | "FAILED" | "CANCELLED" | "REFUNDED";
+          method?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["payments"]["Insert"]>;
+        Relationships: [];
+      };
+      coupons: {
+        Row: {
+          id: string;
+          code: string;
+          type: "PERCENTAGE" | "FIXED";
+          value: number;
+          min_order_amount: number;
+          max_discount_amount: number | null;
+          starts_at: string | null;
+          ends_at: string | null;
+          usage_limit: number | null;
+          per_user_limit: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          code: string;
+          type: "PERCENTAGE" | "FIXED";
+          value: number;
+          min_order_amount?: number;
+          max_discount_amount?: number | null;
+          starts_at?: string | null;
+          ends_at?: string | null;
+          usage_limit?: number | null;
+          per_user_limit?: number;
+          is_active?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["coupons"]["Insert"]>;
+        Relationships: [];
+      };
+      coupon_usage: {
+        Row: {
+          id: string;
+          coupon_id: string;
+          // nullable since Phase 7 — guest orders can still count toward
+          // a coupon's global usage_limit, just not per-user_limit
+          user_id: string | null;
+          order_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          coupon_id: string;
+          user_id?: string | null;
+          order_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["coupon_usage"]["Insert"]>;
         Relationships: [];
       };
       carts: {

@@ -18,15 +18,15 @@ export function ProductActions({
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
 
-  function addToCart(redirectToCart: boolean) {
+  function addToCart(buyNow: boolean) {
     startTransition(async () => {
       const result = await addToCartAction(productId, quantity);
       if ("error" in result) {
         setMessage(result.error);
         return;
       }
-      if (redirectToCart) {
-        router.push("/cart");
+      if (buyNow) {
+        router.push("/checkout");
         return;
       }
       setMessage("Added to bag");
