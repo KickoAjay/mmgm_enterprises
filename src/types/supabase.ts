@@ -547,6 +547,46 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["coupon_usage"]["Insert"]>;
         Relationships: [];
       };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          title: string;
+          body: string | null;
+          is_read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          title: string;
+          body?: string | null;
+          is_read?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["notifications"]["Insert"]>;
+        Relationships: [];
+      };
+      notification_logs: {
+        Row: {
+          id: string;
+          notification_id: string | null;
+          channel: string;
+          status: string;
+          provider_response: unknown;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          notification_id?: string | null;
+          channel: string;
+          status: string;
+          provider_response?: unknown;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["notification_logs"]["Insert"]
+        >;
+        Relationships: [];
+      };
       carts: {
         Row: {
           id: string;

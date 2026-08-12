@@ -729,11 +729,40 @@ CashfreeCheckout (client)            → loads Cashfree's hosted checkout
   renders the "online payment isn't connected yet" fallback instead of
   attempting a Cashfree API call that would just fail. This is what makes
   Phase 7's checkout flow still fully clickable end-to-end today.
-- **No confirmation email** — "SEND CONFIRMATION" is the last step of the
-  spec §28 flow diagram, but no email provider (Resend/SMTP) is configured
-  anywhere in this project yet. Left undone rather than faked; likely
-  belongs with the `notifications` table (spec §40) in a later phase.
 - Cashfree's checkout UI is loaded from `sdk.cashfree.com` via
   `next/script` — this is Cashfree's actual PCI-compliant hosted payment
   page, not something reproducible via an npm package, and is what their
   own integration docs direct you to load.
+
+## 24. Order Confirmation Email (Resend, pulled forward from Phase 13)
+
+"SEND CONFIRMATION", the last step of the spec §28 flow diagram, initially
+shipped with Phase 8 as a no-op (no email provider was configured). The
+user asked for Resend specifically, so this closes that gap — scoped to
+just the order-confirmation email; other notification types (refund
+status, shipment updates) stay in Phase 13 as originally planned.
+
+- `src/lib/email/client.ts` — `sendEmail()`, thin Resend wrapper.
+  `isEmailConfigured()` gates it the same way `isCashfreeConfigured()`
+  gates the payment page — **no real `RESEND_API_KEY` is set in this
+  environment**, so sends currently no-op and get logged as `FAILED` in
+  `notification_logs` rather than thrown. `EMAIL_FROM` defaults to
+  Resend's sandbox address (`onboarding@resend.dev`), which only delivers
+  to the Resend account's own registered email until a domain is
+  verified — fine for testing, not for real customers.
+- `src/lib/email/templates/order-confirmation.ts` — plain inline-styled
+  HTML + text, no `react-email` dependency; matches the burgundy/serif
+  brand palette from §15.
+- `src/features/payments/notify.ts` — `sendOrderConfirmationEmail(orderId)`
+  fetches the order (reusing `getOrderConfirmation`), sends, and logs to
+  `notifications`/`notification_logs` regardless of delivery outcome.
+  Wrapped in try/catch and never throws — a failed or unconfigured email
+  must never undo an already-confirmed payment.
+- **Called from exactly one place**: `confirmPayment()`
+  (`src/features/payments/confirm.ts`), and only on the `"confirmed"`
+  return value from `confirm_order_payment()` — never on
+  `"already_confirmed"`. That's what stops the return-page/webhook race
+  (§23) from sending the email twice for the same order.
+- Awaited, not fire-and-forget — a detached promise can get killed once a
+  serverless function's response is sent (this deploys to Vercel, §13),
+  so the email send has to complete before `confirmPayment()` returns.
