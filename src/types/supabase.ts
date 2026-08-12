@@ -499,6 +499,83 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["shipments"]["Insert"]>;
         Relationships: [];
       };
+      returns: {
+        Row: {
+          id: string;
+          order_id: string;
+          user_id: string;
+          reason: string;
+          status:
+            | "REQUESTED"
+            | "APPROVED"
+            | "REJECTED"
+            | "INFO_REQUESTED"
+            | "PICKUP_SCHEDULED"
+            | "RETURNED";
+          requested_at: string;
+          resolved_at: string | null;
+          admin_note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          user_id: string;
+          reason: string;
+          status?: Database["public"]["Tables"]["returns"]["Row"]["status"];
+          admin_note?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["returns"]["Insert"]>;
+        Relationships: [];
+      };
+      return_items: {
+        Row: {
+          id: string;
+          return_id: string;
+          order_item_id: string;
+          quantity: number;
+          image_urls: string[];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          return_id: string;
+          order_item_id: string;
+          quantity: number;
+          image_urls?: string[];
+        };
+        Update: Partial<Database["public"]["Tables"]["return_items"]["Insert"]>;
+        Relationships: [];
+      };
+      refunds: {
+        Row: {
+          id: string;
+          return_id: string | null;
+          order_id: string;
+          payment_id: string;
+          user_id: string;
+          amount: number;
+          status: "REQUESTED" | "APPROVED" | "INITIATED" | "PROCESSING" | "COMPLETED";
+          cashfree_refund_id: string | null;
+          processed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          return_id?: string | null;
+          order_id: string;
+          payment_id: string;
+          user_id: string;
+          amount: number;
+          status?: Database["public"]["Tables"]["refunds"]["Row"]["status"];
+          cashfree_refund_id?: string | null;
+          processed_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["refunds"]["Insert"]>;
+        Relationships: [];
+      };
       payment_transactions: {
         Row: {
           id: string;

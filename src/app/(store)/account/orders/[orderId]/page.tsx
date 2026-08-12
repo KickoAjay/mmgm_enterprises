@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
 import { getMyOrderDetail } from "@/features/orders/queries";
 import { formatOrderDate } from "@/features/orders/format";
 import { formatINR } from "@/features/products/format";
 import { OrderStatusTimeline } from "@/components/store/orders/order-status-timeline";
+import { Button } from "@/components/ui/button";
 
 export const metadata = {
   title: "Order Details | MMGM Enterprises",
@@ -21,10 +23,19 @@ export default async function OrderDetailPage({
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10">
-      <h1 className="font-serif text-section text-foreground">{order.orderNumber}</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {order.placedAt ? `Placed ${formatOrderDate(order.placedAt)}` : null}
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-section text-foreground">{order.orderNumber}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {order.placedAt ? `Placed ${formatOrderDate(order.placedAt)}` : null}
+          </p>
+        </div>
+        {order.status === "DELIVERED" ? (
+          <Button asChild variant="outline" className="uppercase tracking-wide">
+            <Link href={`/account/orders/${order.id}/return`}>Request Return</Link>
+          </Button>
+        ) : null}
+      </div>
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-8">

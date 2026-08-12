@@ -902,3 +902,64 @@ whenever something else first needs them rather than speculatively now.
   off the sections of spec §26's dashboard (Saved Addresses, Returns,
   Refunds, Notifications) that have nothing behind them yet, rather than
   linking to routes that would 404.
+
+## 26. Returns + Refunds (implemented in Phase 10)
+
+Scoped to the customer-facing half of spec §36/§37 — request a return
+with photo evidence, view return/refund status. "Admin can: Approve /
+Reject / Request Information / Mark Pickup / Mark Returned / Initiate
+Refund" is explicitly an admin action (also matches the RLS: `refunds`
+and `returns.status`/`admin_note` updates have no customer-facing insert/
+update policy at all, only `public.is_admin()`), so none of that exists
+yet — Phase 11.
+
+- **Return requests insert through the normal session-scoped client, not
+  service-role** — unlike checkout's guest-order problem, `returns` and
+  `return_items` already had customer-insert RLS policies from Phase 2
+  (`user_id = auth.uid()`), since a return can only be requested from an
+  account that can see the order via `/account/orders` in the first
+  place. No new RLS needed here, unlike Phase 7.
+- **Eligibility (`src/features/returns/eligibility.ts`) is enforced
+  server-side, both when rendering the request form and again inside
+  `requestReturnAction`** (spec §56.15 "only eligible orders can be
+  returned") — never trusted from what the form last displayed. Three
+  checks: `order.status === 'DELIVERED'`; within the purchased product's
+  `return_period_days` of delivery; and remaining returnable quantity
+  (ordered − already requested across any non-`REJECTED` existing return
+  for that line item — a rejected return frees the quantity back up).
+  "Delivered" is read from `order_status_history`'s `DELIVERED` row
+  rather than `shipments.delivered_at`, since a status transition is
+  guaranteed to write a history row (every status change always has,
+  starting with Phase 7) while nothing guarantees `shipments` gets
+  populated at the same time.
+- **This is currently unreachable in practice**, same as Phase 9's
+  shipped/delivered/cancelled gap: no order can reach `DELIVERED` through
+  any code path in this app yet (no admin panel to advance order status
+  past `ORDER_CONFIRMED`). The logic is correct and was verified by
+  seeding a `DELIVERED` test order directly, not by relaxing the gate to
+  something reachable — returning an item you haven't received yet would
+  be wrong regardless of what's convenient to demo.
+- **Return-evidence photos** (`return-evidence` storage bucket, migration
+  `20260810170000_phase10_returns_storage.sql`, **must be run in the
+  Supabase SQL Editor**) are private, not public like product photography
+  — these can show personal items/addresses in the background. Uploaded
+  directly from the browser (`src/components/store/returns/return-image-upload.tsx`,
+  using the existing `src/lib/db/client.ts` browser client) to a path
+  prefixed with the uploader's own `auth.uid()`, which the bucket's RLS
+  policies enforce; read back via short-lived signed URLs generated
+  server-side (`getMyReturnDetail`), never a public bucket URL. Path
+  convention doubles as the access-control key: `storage.foldername(name))[1]
+  = auth.uid()::text`.
+- **One item per return request**, not a multi-item cart-like form — the
+  schema's `returns.reason` is a single text field per return (not
+  per-item), and real return flows are almost always "return this one
+  thing" anyway; a customer with multiple items to return submits
+  multiple return requests. `reason` is stored as `"<category>: <notes>"`
+  when notes are provided, since the schema has no separate notes column.
+- **`/account/refunds` is read-only and will show nothing until Phase
+  11** — `refunds` has no customer-insert policy at all (admin-only,
+  matching spec's "Initiate Refund" being an admin action), so this phase
+  only builds the list/detail view, ready for real data once an admin
+  panel can create refund rows. Business rule §56.14 "refund cannot
+  exceed eligible amount" is therefore also Phase 11's concern, not
+  something enforced by any code shipped here.

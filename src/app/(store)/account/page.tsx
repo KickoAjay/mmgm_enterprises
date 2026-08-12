@@ -8,9 +8,9 @@ import { formatINR } from "@/features/products/format";
 import { Button } from "@/components/ui/button";
 
 // Dashboard grows alongside each account-area feature as it ships —
-// orders (Phase 9) and wishlist (Phase 6) are real; addresses/returns/
-// refunds/reviews (spec §26) aren't built yet, so they're left off rather
-// than linking to routes that don't exist.
+// orders (Phase 9), returns/refunds (Phase 10), and wishlist (Phase 6)
+// are real; addresses/reviews (spec §26) aren't built yet, so they're
+// left off rather than linking to routes that don't exist.
 export default async function AccountPage() {
   const user = await requireUser();
   const recentOrders = await getMyOrders(3);
@@ -23,9 +23,15 @@ export default async function AccountPage() {
       <h1 className="mt-4 font-serif text-2xl text-foreground">Welcome back</h1>
       <p className="mt-2 text-sm text-muted-foreground">{user.email}</p>
 
-      <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-10 flex flex-wrap gap-3">
         <Button asChild variant="outline" className="uppercase tracking-wide">
           <Link href="/account/wishlist">Wishlist</Link>
+        </Button>
+        <Button asChild variant="outline" className="uppercase tracking-wide">
+          <Link href="/account/returns">Returns</Link>
+        </Button>
+        <Button asChild variant="outline" className="uppercase tracking-wide">
+          <Link href="/account/refunds">Refunds</Link>
         </Button>
         <form action={signOutAction}>
           <Button type="submit" variant="outline" className="uppercase tracking-wide">
