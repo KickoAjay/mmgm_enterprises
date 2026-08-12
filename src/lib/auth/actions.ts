@@ -8,6 +8,7 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
 } from "@/validations/auth";
+import { sendWelcomeEmail } from "@/lib/auth/notify";
 
 export type AuthActionState = { error: string } | { success: true } | null;
 
@@ -42,6 +43,8 @@ export async function signUpAction(
   });
 
   if (error) return { error: error.message };
+
+  await sendWelcomeEmail(email, fullName);
   redirect(`/verify-email?email=${encodeURIComponent(email)}`);
 }
 

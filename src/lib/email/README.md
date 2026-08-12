@@ -1,21 +1,25 @@
 # Email
 
-Order confirmation implemented as part of Phase 8 (pulled forward from the original Phase 13
-scope, at the user's request, once payment confirmation existed to hang it off of). Other
-notification types (refund status, shipment updates, etc.) are still Phase 13.
+Full detail: [`docs/architecture.md` §24](../../../docs/architecture.md). Order confirmation
+started in Phase 8; welcome/payment-confirmation/admin-alert/test-route/status-update templates
+were added once a real Resend account was connected. Shipment/delivery/cancellation emails have
+templates but no trigger yet — no admin order-status-management feature exists in this codebase.
 
-- `client.ts` — `sendEmail()`, a thin Resend wrapper. Never throws — a delivery failure must
-  never undo an already-confirmed payment or order. `isEmailConfigured()` gates callers when
-  `RESEND_API_KEY` isn't set.
-- `templates/order-confirmation.ts` — `buildOrderConfirmationEmail()`, plain inline-styled
-  HTML (no react-email dependency) + a plain-text fallback.
+- `client.ts` — `sendEmail()`, the only caller of the Resend SDK. Never throws. `from` always
+  comes from `EMAIL_FROM`, never a parameter. Validates `to` via zod. `isEmailConfigured()`
+  gates every caller.
+- `log.ts` — `logEmailDelivery()`, shared by every email caller; writes to
+  `notifications`/`notification_logs` regardless of send outcome.
+- `templates/shared.ts` — `emailShell()`, `summaryRow()`, `ctaButton()`, `escapeHtml()`,
+  `formatEmailDate()` — one consistent brand wrapper for every template below.
+- `templates/order-confirmation.ts`, `payment-confirmation.ts`, `admin-new-order.ts`,
+  `welcome.ts`, `test-email.ts`, `order-status-update.ts`.
 
-Orchestration (fetching order data, calling `sendEmail`, logging to `notifications`/
-`notification_logs`) lives in `src/features/payments/notify.ts`, called from
-`src/features/payments/confirm.ts` only on the `"confirmed"` transition — never on
-`"already_confirmed"`, which is what stops the return-page/webhook race from double-sending.
+Orchestration lives in `src/features/payments/notify.ts` (order/payment/admin emails, fired
+from `confirmPayment()` only on the `"confirmed"` transition — never `"already_confirmed"`,
+which is what stops the payment-return-page/webhook race from double-sending) and
+`src/lib/auth/notify.ts` (welcome email, fired from `signUpAction`).
 
-No real Resend API key is configured in this environment — sends silently no-op (logged as
-`FAILED` in `notification_logs`) until one is added to `.env.local`. Default sender is Resend's
-sandbox address (`onboarding@resend.dev`), which only delivers to the account's own registered
-email until a domain is verified.
+`mmgmenterprises.com` is not yet verified in Resend (confirmed via a live API call) — `EMAIL_FROM`
+is the sandbox address (`onboarding@resend.dev`) until it is. See architecture.md §24d for the
+domain-verification steps.

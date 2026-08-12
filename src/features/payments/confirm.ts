@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/db/service";
-import { sendOrderConfirmationEmail } from "@/features/payments/notify";
+import { sendOrderConfirmedNotifications } from "@/features/payments/notify";
 
 export type ConfirmPaymentResult = "confirmed" | "already_confirmed" | "not_found";
 
@@ -33,7 +33,7 @@ export async function confirmPayment(
       .eq("cashfree_order_id", cashfreeOrderId)
       .maybeSingle();
     if (payment) {
-      await sendOrderConfirmationEmail(payment.order_id);
+      await sendOrderConfirmedNotifications(payment.order_id, cashfreePaymentId);
     }
   }
 

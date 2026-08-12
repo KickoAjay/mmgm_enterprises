@@ -734,35 +734,112 @@ CashfreeCheckout (client)            → loads Cashfree's hosted checkout
   page, not something reproducible via an npm package, and is what their
   own integration docs direct you to load.
 
-## 24. Order Confirmation Email (Resend, pulled forward from Phase 13)
+## 24. Resend Email Integration
 
 "SEND CONFIRMATION", the last step of the spec §28 flow diagram, initially
 shipped with Phase 8 as a no-op (no email provider was configured). The
-user asked for Resend specifically, so this closes that gap — scoped to
-just the order-confirmation email; other notification types (refund
-status, shipment updates) stay in Phase 13 as originally planned.
+user connected a real Resend account and asked for the full transactional
+email set, pulling several notification types forward from their
+originally-planned Phase 13.
 
-- `src/lib/email/client.ts` — `sendEmail()`, thin Resend wrapper.
-  `isEmailConfigured()` gates it the same way `isCashfreeConfigured()`
-  gates the payment page — **no real `RESEND_API_KEY` is set in this
-  environment**, so sends currently no-op and get logged as `FAILED` in
-  `notification_logs` rather than thrown. `EMAIL_FROM` defaults to
-  Resend's sandbox address (`onboarding@resend.dev`), which only delivers
-  to the Resend account's own registered email until a domain is
-  verified — fine for testing, not for real customers.
-- `src/lib/email/templates/order-confirmation.ts` — plain inline-styled
-  HTML + text, no `react-email` dependency; matches the burgundy/serif
-  brand palette from §15.
-- `src/features/payments/notify.ts` — `sendOrderConfirmationEmail(orderId)`
-  fetches the order (reusing `getOrderConfirmation`), sends, and logs to
-  `notifications`/`notification_logs` regardless of delivery outcome.
-  Wrapped in try/catch and never throws — a failed or unconfigured email
-  must never undo an already-confirmed payment.
-- **Called from exactly one place**: `confirmPayment()`
-  (`src/features/payments/confirm.ts`), and only on the `"confirmed"`
-  return value from `confirm_order_payment()` — never on
-  `"already_confirmed"`. That's what stops the return-page/webhook race
-  (§23) from sending the email twice for the same order.
-- Awaited, not fire-and-forget — a detached promise can get killed once a
-  serverless function's response is sent (this deploys to Vercel, §13),
-  so the email send has to complete before `confirmPayment()` returns.
+**Live-verified against the real Resend account** (not just typechecked):
+a direct API call confirmed the API key works and that
+`mmgmenterprises.com` is **not yet verified** in Resend — sending from
+`orders@mmgmenterprises.com` returns a 403 (`domain not verified`).
+`EMAIL_FROM` is set back to the sandbox address
+(`onboarding@resend.dev`) accordingly; a live test send through it
+succeeded. Sandbox mode only delivers to the Resend account's own
+registered email address — a different address than the one the sends
+were tested to reach — until a domain is verified (§24d).
+
+### 24a. Shared building blocks
+
+- `src/lib/email/client.ts` — `sendEmail()`, the only place that calls the
+  Resend SDK. `isEmailConfigured()` gates every caller. `from` is never a
+  parameter — always the fixed `EMAIL_FROM`, never chosen by a caller.
+  Validates `to` with `zod`'s `z.email()` before attempting a send.
+  Never throws; returns `{ success, error? }`.
+- `src/lib/email/log.ts` — `logEmailDelivery()`, shared by every email
+  caller. Every send attempt gets a `notifications` row (parent) and a
+  `notification_logs` row (`channel: "email"`, `status: "SENT" | "FAILED"`)
+  regardless of outcome — nothing is silently lost.
+- `src/lib/email/templates/shared.ts` — `emailShell()`, `summaryRow()`,
+  `ctaButton()`, `escapeHtml()`, `formatEmailDate()` (IST-formatted). One
+  wrapper so five templates read as one consistent brand, not five one-off
+  designs — inline styles only, since email clients strip `<style>`
+  blocks unpredictably.
+
+### 24b. Templates and what triggers them
+
+| Template                             | Sent from                                       | Trigger                                                             |
+| ------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------- |
+| `templates/test-email.ts`             | `POST /api/send-email`                           | Manual, dev-only (§24c)                                               |
+| `templates/welcome.ts`                | `src/lib/auth/notify.ts`                         | `signUpAction` (`src/lib/auth/actions.ts`), right after `auth.signUp` succeeds |
+| `templates/order-confirmation.ts`     | `src/features/payments/notify.ts`                | `confirmPayment()` "confirmed" transition                             |
+| `templates/payment-confirmation.ts`   | `src/features/payments/notify.ts`                | same, alongside order confirmation                                    |
+| `templates/admin-new-order.ts`        | `src/features/payments/notify.ts`                | same, only if `ADMIN_NOTIFICATION_EMAIL` is set                       |
+| `templates/order-status-update.ts`    | `sendOrderStatusUpdateNotification()` (unwired)  | **nothing yet** — see §24e                                            |
+
+`sendOrderConfirmedNotifications(orderId, cashfreePaymentId)`
+(`src/features/payments/notify.ts`) is the single entry point for the
+three payment-time emails: one `getOrderConfirmation` fetch, fanned out
+to customer-order-confirmation, customer-payment-confirmation, and
+admin-alert via `Promise.all` (each independently try/caught so one
+failing send doesn't cancel the others). `confirmPayment()`
+(`src/features/payments/confirm.ts`) calls it exactly once, only on the
+`"confirmed"` return value from `confirm_order_payment()` — never on
+`"already_confirmed"`. That's what stops the payment-return-page/webhook
+race (§23) from double-sending, and it's inherited automatically by all
+three emails since they share that one call site. Awaited, not
+fire-and-forget — a detached promise can get killed once a serverless
+function's response is sent (this deploys to Vercel, §13).
+
+Payment confirmation emails never include card numbers, CVV, or other raw
+payment-instrument data — this app never touches card data at all,
+Cashfree's hosted checkout does; only amount/status/ids are shown.
+
+### 24c. Test route
+
+`POST /api/send-email` (`src/app/api/send-email/route.ts`) — body
+`{ "to": "you@example.com" }`, sends the fixed test-email template.
+Not a general-purpose "send any email" endpoint: subject/body are fixed,
+`to` is the only caller-supplied field (zod-validated), and `from` still
+always comes from `EMAIL_FROM` inside `sendEmail()`. Gated by
+`NODE_ENV !== "production"` rather than admin auth — there's no admin
+panel/`admin_users` row set up in this environment yet to gate it behind
+(that's a later phase), so the environment check is what keeps this from
+becoming an open relay once deployed. Returns 404 outright in production.
+
+### 24d. Connecting a real domain (when ready)
+
+1. In the Resend dashboard → Domains → Add Domain, enter
+   `mmgmenterprises.com` (or whichever domain will send this mail).
+2. Resend generates the exact DNS records to add (SPF/DKIM as TXT/CNAME,
+   typically) — **specific to that domain and that Resend account**, so
+   they can't be hard-coded here; use exactly what the dashboard shows.
+3. Add those records at the DNS provider that hosts `mmgmenterprises.com`
+   (registrar or DNS host — wherever its other DNS records currently
+   live).
+4. Back in Resend, click Verify — propagation can take anywhere from
+   minutes to ~48 hours depending on the DNS host.
+5. Once verified, change `EMAIL_FROM` in `.env.local` (and in Vercel's
+   project environment variables for production) to
+   `MMGM Enterprises <orders@mmgmenterprises.com>` — no code change
+   needed, every template already reads `EMAIL_FROM` at send time.
+
+### 24e. Not built: order-status-change emails
+
+Shipped/Delivered/Cancelled emails have templates and a ready-to-call
+function (`sendOrderStatusUpdateNotification(orderId, data)`), but
+**nothing calls it** — there is no admin order-status-management feature
+anywhere in this codebase (no `/admin` routes exist at all yet; that's
+Phase 11). Building a fake "admin changes status" action just to have a
+trigger would be its own kind of faking it. Wiring these in is a one-line
+call once that admin feature exists. Cancellation-reason capture has the
+same gap: no customer- or admin-facing cancellation flow exists yet
+either.
+
+Password reset intentionally has no Resend equivalent — Supabase Auth
+already sends that email itself (`resetPasswordForEmail`/`updateUser` in
+`src/lib/auth/actions.ts`, unchanged), and duplicating it would mean two
+different reset links/flows for the same action.

@@ -1,8 +1,12 @@
 import { formatINR } from "@/features/products/format";
+import { COLORS, emailShell, escapeHtml, summaryRow } from "@/lib/email/templates/shared";
 
 export type OrderConfirmationEmailData = {
   orderNumber: string;
-  items: { name: string; quantity: number; lineTotal: number }[];
+  customerName: string;
+  orderDate: string;
+  orderStatus: string;
+  items: { name: string; quantity: number; unitPrice: number; lineTotal: number }[];
   subtotal: number;
   productDiscount: number;
   couponDiscount: number;
@@ -20,19 +24,6 @@ export type OrderConfirmationEmailData = {
   } | null;
 };
 
-const BRAND = "#7A1830";
-const TEXT = "#171717";
-const MUTED = "#666666";
-const BORDER = "#EAEAEA";
-const SOFT_BG = "#F7F7F5";
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
 export function buildOrderConfirmationEmail(data: OrderConfirmationEmailData): {
   subject: string;
   html: string;
@@ -44,44 +35,37 @@ export function buildOrderConfirmationEmail(data: OrderConfirmationEmailData): {
     .map(
       (item) => `
         <tr>
-          <td style="padding:8px 0;color:${TEXT};font-size:14px;">${escapeHtml(item.name)} × ${item.quantity}</td>
-          <td style="padding:8px 0;color:${TEXT};font-size:14px;text-align:right;">${formatINR(item.lineTotal)}</td>
+          <td style="padding:8px 0;color:${COLORS.TEXT};font-size:14px;">${escapeHtml(item.name)}<br /><span style="color:${COLORS.MUTED};font-size:12px;">Qty ${item.quantity} × ${formatINR(item.unitPrice)}</span></td>
+          <td style="padding:8px 0;color:${COLORS.TEXT};font-size:14px;text-align:right;vertical-align:top;">${formatINR(item.lineTotal)}</td>
         </tr>`,
     )
     .join("");
 
-  const summaryRow = (label: string, value: string) => `
-    <tr>
-      <td style="padding:4px 0;color:${MUTED};font-size:13px;">${label}</td>
-      <td style="padding:4px 0;color:${TEXT};font-size:13px;text-align:right;">${value}</td>
-    </tr>`;
-
   const address = data.shippingAddress;
 
-  const html = `
-  <div style="font-family:Georgia,'Times New Roman',serif;background:${SOFT_BG};padding:32px 16px;">
-    <div style="max-width:480px;margin:0 auto;background:#FFFFFF;border:1px solid ${BORDER};padding:32px;">
-      <h1 style="color:${BRAND};font-size:20px;margin:0 0 8px;">MMGM Enterprises</h1>
-      <p style="color:${TEXT};font-size:16px;margin:0 0 4px;">Thank you for your order</p>
-      <p style="color:${MUTED};font-size:13px;margin:0 0 24px;">
-        Order <strong style="color:${TEXT};">${escapeHtml(data.orderNumber)}</strong> is confirmed.
+  const body = `
+      <h1 style="color:${COLORS.BRAND};font-size:20px;margin:0 0 8px;">MMGM Enterprises</h1>
+      <p style="color:${COLORS.TEXT};font-size:16px;margin:0 0 4px;">Hi ${escapeHtml(data.customerName)}, thank you for your order</p>
+      <p style="color:${COLORS.MUTED};font-size:13px;margin:0 0 24px;">
+        Order <strong style="color:${COLORS.TEXT};">${escapeHtml(data.orderNumber)}</strong> —
+        placed ${escapeHtml(data.orderDate)} — status: ${escapeHtml(data.orderStatus)}
       </p>
 
-      <table style="width:100%;border-collapse:collapse;border-top:1px solid ${BORDER};padding-top:8px;">
+      <table style="width:100%;border-collapse:collapse;border-top:1px solid ${COLORS.BORDER};padding-top:8px;">
         ${rows}
       </table>
 
-      <table style="width:100%;border-collapse:collapse;border-top:1px solid ${BORDER};margin-top:12px;padding-top:8px;">
+      <table style="width:100%;border-collapse:collapse;border-top:1px solid ${COLORS.BORDER};margin-top:12px;padding-top:8px;">
         ${summaryRow("Subtotal", formatINR(data.subtotal))}
         ${data.productDiscount > 0 ? summaryRow("Product Discount", `−${formatINR(data.productDiscount)}`) : ""}
         ${data.couponDiscount > 0 ? summaryRow("Coupon Discount", `−${formatINR(data.couponDiscount)}`) : ""}
         ${summaryRow("Shipping", data.shippingFee === 0 ? "Free" : formatINR(data.shippingFee))}
         ${summaryRow("GST", formatINR(data.taxAmount))}
       </table>
-      <table style="width:100%;border-collapse:collapse;border-top:1px solid ${BORDER};margin-top:8px;padding-top:8px;">
+      <table style="width:100%;border-collapse:collapse;border-top:1px solid ${COLORS.BORDER};margin-top:8px;padding-top:8px;">
         <tr>
-          <td style="padding:8px 0;color:${TEXT};font-size:15px;font-weight:bold;">Grand Total</td>
-          <td style="padding:8px 0;color:${TEXT};font-size:15px;font-weight:bold;text-align:right;">${formatINR(data.grandTotal)}</td>
+          <td style="padding:8px 0;color:${COLORS.TEXT};font-size:15px;font-weight:bold;">Grand Total</td>
+          <td style="padding:8px 0;color:${COLORS.TEXT};font-size:15px;font-weight:bold;text-align:right;">${formatINR(data.grandTotal)}</td>
         </tr>
       </table>
 
@@ -89,8 +73,8 @@ export function buildOrderConfirmationEmail(data: OrderConfirmationEmailData): {
         address
           ? `
       <div style="margin-top:24px;">
-        <p style="color:${MUTED};font-size:12px;letter-spacing:0.05em;text-transform:uppercase;margin:0 0 8px;">Shipping To</p>
-        <p style="color:${TEXT};font-size:13px;margin:0;line-height:1.5;">
+        <p style="color:${COLORS.MUTED};font-size:12px;letter-spacing:0.05em;text-transform:uppercase;margin:0 0 8px;">Shipping To</p>
+        <p style="color:${COLORS.TEXT};font-size:13px;margin:0;line-height:1.5;">
           ${escapeHtml(address.fullName)}<br />
           ${escapeHtml(address.line1)}${address.line2 ? `<br />${escapeHtml(address.line2)}` : ""}<br />
           ${escapeHtml(address.city)}, ${escapeHtml(address.state)} ${escapeHtml(address.pincode)}<br />
@@ -98,18 +82,17 @@ export function buildOrderConfirmationEmail(data: OrderConfirmationEmailData): {
         </p>
       </div>`
           : ""
-      }
-
-      <p style="color:${MUTED};font-size:12px;margin-top:32px;">MMGM Enterprises</p>
-    </div>
-  </div>`;
+      }`;
 
   const textLines = [
     `Order Confirmed — ${data.orderNumber}`,
     "",
-    "Thank you for your order.",
+    `Hi ${data.customerName}, thank you for your order.`,
+    `Placed ${data.orderDate} — status: ${data.orderStatus}`,
     "",
-    ...data.items.map((item) => `${item.name} x${item.quantity} — ${formatINR(item.lineTotal)}`),
+    ...data.items.map(
+      (item) => `${item.name} x${item.quantity} (${formatINR(item.unitPrice)} each) — ${formatINR(item.lineTotal)}`,
+    ),
     "",
     `Subtotal: ${formatINR(data.subtotal)}`,
     ...(data.productDiscount > 0 ? [`Product Discount: -${formatINR(data.productDiscount)}`] : []),
@@ -130,5 +113,5 @@ export function buildOrderConfirmationEmail(data: OrderConfirmationEmailData): {
       : []),
   ];
 
-  return { subject, html, text: textLines.join("\n") };
+  return { subject, html: emailShell(body), text: textLines.join("\n") };
 }
