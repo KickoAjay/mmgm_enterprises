@@ -843,3 +843,62 @@ Password reset intentionally has no Resend equivalent — Supabase Auth
 already sends that email itself (`resetPasswordForEmail`/`updateUser` in
 `src/lib/auth/actions.ts`, unchanged), and duplicating it would mean two
 different reset links/flows for the same action.
+
+## 25. Orders + Tracking (implemented in Phase 9)
+
+Scoped to exactly what spec §63 names for this phase — order history/
+detail for logged-in customers and the guest-accessible `/track-order`
+lookup (spec §29/§30). Everything else `/account` (§26) eventually needs —
+`/account/profile`, `/account/addresses`, `/account/returns`,
+`/account/refunds`, `/account/reviews` — stays out of scope; Returns +
+Refunds is explicitly Phase 10, Admin (which is what would ever populate
+`shipments` or move an order past `ORDER_CONFIRMED`) is Phase 11, and
+profile/addresses have no dedicated phase in §63 at all, so they get built
+whenever something else first needs them rather than speculatively now.
+
+- `src/features/orders/status.ts` — the single source of truth for order
+  status labels and the 8-step happy-path timeline
+  (`TIMELINE_STATUSES`/`TIMELINE_STEP_LABELS`), shared by
+  `/account/orders`, `/account/orders/[orderId]`, `/track-order`, and the
+  Phase 7 confirmation page (which had its own duplicate `STATUS_LABELS`
+  map — now imports this instead).
+- `src/components/store/orders/order-status-timeline.tsx` —
+  `OrderStatusTimeline`, deliberately has no server-only imports and no
+  hooks so the same component renders inside both a Server Component
+  (`/account/orders/[orderId]`) and a Client Component rendering a Server
+  Action's result (`/track-order`). For `CANCELLED` and the
+  `RETURN_*`/`REFUND_*`/`EXCHANGE_REQUESTED` statuses, it shows a banner
+  instead of forcing them onto the linear 8-step line — those aren't points
+  on the happy path.
+- **`/account/orders` and `/account/orders/[orderId]`**
+  (`src/features/orders/queries.ts`) read with the normal session-scoped
+  client, not service-role — RLS ("Users view own orders", Phase 2)
+  already restricts these to `auth.uid()`, the same way cart/wishlist
+  queries work. This only works for logged-in users; there is no
+  guest-order-history equivalent by design (that's what `/track-order`
+  is for).
+- **`/track-order`** (`src/features/orders/tracking.ts`,
+  `trackOrderAction`) has no session to scope against, so it proves
+  identity at request time instead: order number + the email or mobile
+  registered against that order (guest or account) must both match, via
+  the service-role client. Returns the same generic error whether the
+  order number or the contact was wrong, so it can't be used to enumerate
+  valid order numbers. **No rate limiting exists anywhere in this
+  project** (spec §42 is Phase 14) — this endpoint doesn't add one either;
+  a known, project-wide gap, not something specific to this route.
+  Deliberately shows less than the account order-detail view — status,
+  timeline, and shipment info only, no items/prices/addresses — since
+  order-number-plus-contact is weaker proof of identity than an
+  authenticated session or the unguessable-order-ID link the checkout
+  confirmation page uses.
+- **Courier/tracking number/estimated delivery** (spec §30) read from the
+  `shipments` table, which exists in the schema (Phase 1) but nothing
+  writes to yet — there's no admin panel (Phase 11) to enter shipment
+  info. Both the order-detail page and `/track-order` simply omit that
+  section when no `shipments` row exists, rather than showing empty
+  fields or fabricating placeholder tracking data.
+- `/account` is upgraded from Phase 2's placeholder into a real dashboard
+  showing the 3 most recent orders + a link to Wishlist — still leaves
+  off the sections of spec §26's dashboard (Saved Addresses, Returns,
+  Refunds, Notifications) that have nothing behind them yet, rather than
+  linking to routes that would 404.

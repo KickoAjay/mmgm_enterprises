@@ -475,6 +475,30 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["payments"]["Insert"]>;
         Relationships: [];
       };
+      shipments: {
+        Row: {
+          id: string;
+          order_id: string;
+          courier_name: string | null;
+          tracking_number: string | null;
+          estimated_delivery: string | null;
+          shipped_at: string | null;
+          delivered_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          courier_name?: string | null;
+          tracking_number?: string | null;
+          estimated_delivery?: string | null;
+          shipped_at?: string | null;
+          delivered_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["shipments"]["Insert"]>;
+        Relationships: [];
+      };
       payment_transactions: {
         Row: {
           id: string;

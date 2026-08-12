@@ -1,23 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getOrderConfirmation } from "@/features/checkout/queries";
+import { ORDER_STATUS_LABELS, type OrderStatus } from "@/features/orders/status";
 import { formatINR } from "@/features/products/format";
 import { Button } from "@/components/ui/button";
 
 export const metadata = {
   title: "Order Confirmation | MMGM Enterprises",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  PENDING_PAYMENT: "Payment Pending",
-  PAYMENT_CONFIRMED: "Payment Confirmed",
-  ORDER_CONFIRMED: "Order Confirmed",
-  PROCESSING: "Processing",
-  PACKED: "Packed",
-  SHIPPED: "Shipped",
-  OUT_FOR_DELIVERY: "Out for Delivery",
-  DELIVERED: "Delivered",
-  CANCELLED: "Cancelled",
 };
 
 export default async function OrderConfirmationPage({
@@ -81,7 +70,7 @@ export default async function OrderConfirmationPage({
             Order Status
           </h2>
           <p className="mt-3 text-sm text-foreground">
-            {STATUS_LABELS[order.status] ?? order.status}
+            {ORDER_STATUS_LABELS[order.status as OrderStatus] ?? order.status}
           </p>
         </div>
       </div>

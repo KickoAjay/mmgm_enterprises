@@ -19,6 +19,7 @@ const SHOP_LINKS = [
 
 const CARE_LINKS = [
   { label: "Contact", href: "/contact" },
+  { label: "Track Order", href: "/track-order" },
   { label: "FAQ", href: "/faq" },
   { label: "Shipping", href: "/shipping" },
   { label: "Returns", href: "/account/returns" },
