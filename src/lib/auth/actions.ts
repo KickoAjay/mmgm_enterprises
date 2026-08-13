@@ -62,6 +62,20 @@ export async function signInAction(
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) return { error: "Invalid email or password" };
 
+  // Admin-disabled accounts (Phase 11 "Enable/Disable Account", spec §39)
+  // authenticate fine against Supabase Auth — is_active lives in our own
+  // `users` row, not theirs — so it's checked and enforced here.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase.from("users").select("is_active").eq("id", user.id).maybeSingle()
+    : { data: null };
+  if (profile && !profile.is_active) {
+    await supabase.auth.signOut();
+    return { error: "This account has been disabled. Contact support for help." };
+  }
+
   redirect("/account");
 }
 

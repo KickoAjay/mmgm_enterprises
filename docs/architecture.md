@@ -956,10 +956,184 @@ yet — Phase 11.
   thing" anyway; a customer with multiple items to return submits
   multiple return requests. `reason` is stored as `"<category>: <notes>"`
   when notes are provided, since the schema has no separate notes column.
-- **`/account/refunds` is read-only and will show nothing until Phase
-  11** — `refunds` has no customer-insert policy at all (admin-only,
-  matching spec's "Initiate Refund" being an admin action), so this phase
-  only builds the list/detail view, ready for real data once an admin
-  panel can create refund rows. Business rule §56.14 "refund cannot
-  exceed eligible amount" is therefore also Phase 11's concern, not
-  something enforced by any code shipped here.
+- **`/account/refunds` is read-only and shows nothing until an admin
+  initiates one** — `refunds` has no customer-insert policy at all
+  (admin-only, matching spec's "Initiate Refund" being an admin action),
+  so this phase only builds the list/detail view. Phase 11 is what
+  finally creates refund rows.
+
+## 27. Admin Dashboard (implemented in Phase 11)
+
+By far the largest single phase — covers spec §31–33 (Admin Panel,
+Product Management, Image Management), §39 (Customer Management), and
+§41 (RBAC), plus the admin-side halves of order management (§29) and
+returns/refunds (§36/§37) that earlier phases built the customer-facing
+half of and left waiting. Two things named in spec §63's phase breakdown
+are deliberately **not** here even though related spec sections mention
+them: Inventory (§34) and Coupons (§35) are explicitly Phase 12; the
+chart section of §31's dashboard (Daily/Monthly Sales, Revenue Trends,
+Top Selling Sarees, Category Performance) is Phase 13 "Reports +
+Notifications" — this phase's dashboard is the card row only.
+
+### 27a. Bootstrapping the first admin
+
+Phase 2 gave `admin_users` a SELECT policy only, with its own comment
+deferring writes to "Phase 11" by name. Writing an `admin_users` row
+requires `public.is_admin()`, which is false for everyone until one
+exists — a chicken-and-egg problem for the very first admin account.
+Solved the standard way, in migration `20260810180000_phase11_admin.sql`
+(**must be run in the Supabase SQL Editor**): a self-limiting RLS policy
+that allows exactly one self-insert, and only while `admin_users` is
+completely empty —
+
+```sql
+create policy "First admin can self-bootstrap" on admin_users
+  for insert to authenticated
+  with check (user_id = auth.uid() and not exists (select 1 from admin_users));
+```
+
+— after the first row exists, that branch is permanently false for
+everyone; every admin after that is created by an existing SUPER_ADMIN
+via `/admin/team` (`createAdminAction`, which promotes an existing
+*registered customer account* rather than minting new credentials).
+
+`requireAdmin()` (`src/lib/auth/session.ts`) checks whether `admin_users`
+is genuinely empty (via service-role, since a non-admin can't even see
+that it's empty under its own SELECT policy) and routes a fresh install
+to `/admin/setup` instead of `/admin/login`, which would otherwise
+dead-end. `/admin/setup` itself requires an ordinary logged-in customer
+session (`requireUser()`) — sign up on the storefront first, then visit
+`/admin/setup` to become SUPER_ADMIN.
+
+**Live-verified, not just read from the RLS policy SQL**: created a real
+Supabase auth user via the admin API, inserted an `admin_users` row for
+them via service-role (simulating what the bootstrap policy lets the
+*real* first admin do), signed in to get a real access token, and
+confirmed via direct REST calls that this admin token can update any
+order's status and insert `order_status_history`, while the same request
+with only the anon key returns an empty result set (RLS-filtered, not a
+403 — PostgREST's default behavior for an UPDATE that matches zero rows
+under RLS) and leaves the order state unchanged. Cleaned up afterward.
+
+### 27b. RBAC — role-based, not the granular permissions table
+
+`admin_users.role_id` → `roles.name` (`SUPER_ADMIN`, `ADMIN`,
+`ORDER_MANAGER`, `PRODUCT_MANAGER`, `INVENTORY_MANAGER`,
+`CUSTOMER_SUPPORT`, seeded since Phase 1) is what every admin Server
+Action checks via `requireRole([...])` (`src/lib/auth/session.ts`).
+The `permissions`/`role_permissions` tables exist in the schema but were
+never seeded with any permission codes — spec §41 requires roles and
+server-side enforcement, not that specific table being populated, so
+this phase enforces access by role name directly rather than inventing a
+permission taxonomy nobody specified. `/admin/team` (admin account
+management) is SUPER_ADMIN-only; everything else is scoped per-domain
+(e.g. products need `PRODUCT_MANAGER`+, orders need `ORDER_MANAGER`+).
+
+**A build-time lesson worth recording**: a `"use server"` file may only
+export async functions — Next.js's compiler rejects any other export
+from one. The pure transition-table helpers (`getAllowedNextStatuses`,
+`getAllowedReturnTransitions`, `getNextRefundStatus`) originally lived in
+the same file as their related Server Actions and needed to be called
+from Client Components to render dropdown options; `tsc --noEmit` didn't
+catch this (it's a Next.js compiler rule, not a TypeScript one) — only
+`next build` did. Fixed by moving each helper into its domain's
+`status.ts` (no `"use server"`), imported by both the action file and the
+client component.
+
+### 27c. Disabling an account is real, not cosmetic
+
+`users.is_active` existed in the schema since Phase 1 but nothing ever
+read it. `signInAction` (`src/lib/auth/actions.ts`) now checks it right
+after a successful password check and signs the session back out if
+false — spec §39's "Enable/Disable Account" actually blocks login, not
+just a flag with no effect elsewhere in the app.
+
+### 27d. Products, images, and video
+
+- `src/features/products/admin-queries.ts` / `admin-actions.ts` — full
+  CRUD. **Never a hard DELETE** — `order_items.product_id` is `ON DELETE
+  RESTRICT` by design (a sold product's history must survive), so
+  "Archive" (`products.status = 'ARCHIVED'`) is the only removal path,
+  consistent with how the storefront has treated "deleted" products since
+  Phase 4.
+- `discount_amount` is computed automatically as
+  `max(0, originalPrice - sellingPrice)` rather than exposed as its own
+  form field — it's a real column but nothing in the app has ever read it
+  independently of `discount_percent` (a *generated* column computed
+  directly from the two prices, Phase 4), so a separate admin-entered
+  value for it would just be a second, driftable source of truth.
+- **`product-media` is a public storage bucket** (migration
+  `20260810180000_phase11_admin.sql`), unlike Phase 10's private
+  `return-evidence` bucket — product photography and video are marketing
+  assets meant to be served to every storefront visitor. Writes
+  (insert/update/delete) are still admin-only; next.config.ts already
+  allowed `**.supabase.co` in `images.remotePatterns` since Phase 5, so
+  no further config was needed for `next/image` to serve these.
+  "Optimize images before serving" (spec §33) is satisfied by
+  `next/image`'s request-time optimization rather than a separate
+  processing step at upload time.
+- Reorder is up/down buttons rewriting `sort_order` sequentially, not a
+  drag-and-drop library — avoids a new dependency for a rarely-used
+  admin-only interaction with a handful of images per product.
+- One video per product (`setProductVideoAction` replaces any existing
+  one rather than managing a list) — matches how saree listings
+  realistically use video (one drape/turntable demo, not a gallery).
+
+### 27e. Orders — the keystone that unblocks Phase 9 and 10
+
+`src/features/orders/admin-actions.ts`'s `updateOrderAction` is the
+first and only code path in this entire project that can move an order
+past `ORDER_CONFIRMED`. Every "this doesn't have a trigger yet" gap
+flagged since Phase 8 traces back to this:
+
+- Phase 8's `sendOrderStatusUpdateNotification` (SHIPPED/DELIVERED/
+  CANCELLED emails) — now called here, on an actual transition, not a
+  shipment-info-only edit.
+- Phase 9's courier/tracking-number/estimated-delivery display — now
+  populated via the same form (`shipments` upsert alongside the status
+  change).
+- Phase 10's return eligibility gate (`order.status === 'DELIVERED'`) —
+  now actually reachable, for the first time, through this admin action.
+
+`ALLOWED_TRANSITIONS` (`src/features/orders/status.ts`, not
+`admin-actions.ts` — see §27b) intentionally excludes
+`RETURN_*`/`REFUND_*`/`EXCHANGE_REQUESTED` from the admin status
+dropdown entirely: those order-level enum values predate Phase 10's
+separate `returns`/`refunds` tables and would be a second, competing way
+to represent the same state if exposed here. An order's `status` stays on
+the linear fulfillment path; return/refund state lives only in the
+dedicated tables.
+
+### 27f. Returns and refunds — the admin half
+
+`src/features/returns/admin-actions.ts`: `updateReturnStatusAction`
+walks a return through `REQUESTED → APPROVED/REJECTED/INFO_REQUESTED →
+PICKUP_SCHEDULED → RETURNED`. Once `RETURNED`, `initiateRefundAction`
+creates the `refunds` row — this is the **first code in the project that
+writes to `refunds` at all**, closing the gap Phase 10 flagged
+("`/account/refunds` will show nothing until an admin exists"). Refund
+amount is capped server-side at the sum of `order_items.unit_price ×
+returned_quantity` for the items on that return (business rule §56.14
+"never allow refund amount greater than eligible amount") — re-checked on
+submission, never trusted from what the form displayed.
+
+`src/features/refunds/admin-actions.ts`'s `advanceRefundStatusAction`
+moves a refund through spec §37's `REQUESTED → APPROVED → INITIATED →
+PROCESSING → COMPLETED` one stage at a time. **This is bookkeeping only —
+no Cashfree Refunds API call happens at any stage.** Marking a refund
+`COMPLETED` here records that it was completed; it does not cause money
+to move. Spec §37 asks for a refund "linked to Order, Payment, Customer,
+Product, Amount" and a lifecycle to track, but doesn't name a gateway
+integration the way §28 explicitly does for payment collection — actually
+calling Cashfree's Refunds API was judged out of scope for this phase and
+is flagged here rather than silently skipped. `cashfree_refund_id` stays
+`null` throughout.
+
+### 27g. Customers
+
+`src/features/customers/queries.ts` never selects anything
+payment-credential-shaped (spec §39) — there's nothing of that shape
+anywhere in this schema to leak in the first place (Cashfree's hosted
+checkout means this app never touches card data). Total spending is
+computed the same way the admin dashboard computes revenue: sum of
+`grand_total` across orders that aren't `PENDING_PAYMENT` or `CANCELLED`.

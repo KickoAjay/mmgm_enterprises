@@ -64,3 +64,28 @@ export const TIMELINE_STEP_LABELS: Record<string, string> = {
 export function isOffTimelineStatus(status: string): boolean {
   return !TIMELINE_STATUSES.includes(status as OrderStatus);
 }
+
+// The "happy path" an admin can move an order through by hand.
+// PENDING_PAYMENT → ORDER_CONFIRMED is the payment flow's job (Phase 8's
+// confirm_order_payment), not this — admin only takes over from
+// ORDER_CONFIRMED onward, plus CANCELLED as an escape hatch. RETURN_*/
+// REFUND_*/EXCHANGE_REQUESTED are deliberately not reachable from here:
+// those are driven by the separate returns/refunds workflow (Phase 10),
+// not by hand-picking an order_status value.
+//
+// Lives here rather than admin-actions.ts — a "use server" file may only
+// export async functions, and this needs to be called from a Client
+// Component to render the status dropdown's options.
+const ALLOWED_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
+  PENDING_PAYMENT: ["CANCELLED"],
+  PAYMENT_CONFIRMED: ["ORDER_CONFIRMED", "CANCELLED"],
+  ORDER_CONFIRMED: ["PROCESSING", "CANCELLED"],
+  PROCESSING: ["PACKED", "CANCELLED"],
+  PACKED: ["SHIPPED", "CANCELLED"],
+  SHIPPED: ["OUT_FOR_DELIVERY"],
+  OUT_FOR_DELIVERY: ["DELIVERED"],
+};
+
+export function getAllowedNextStatuses(current: string): OrderStatus[] {
+  return ALLOWED_TRANSITIONS[current as OrderStatus] ?? [];
+}

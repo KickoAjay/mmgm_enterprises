@@ -101,6 +101,7 @@ export type Database = {
           role_id: string;
           full_name: string;
           is_active?: boolean;
+          last_login_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["admin_users"]["Insert"]>;
         Relationships: [];
@@ -241,6 +242,23 @@ export type Database = {
         Update: Partial<
           Database["public"]["Tables"]["product_images"]["Insert"]
         >;
+        Relationships: [];
+      };
+      product_videos: {
+        Row: {
+          id: string;
+          product_id: string;
+          url: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          url: string;
+          sort_order?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["product_videos"]["Insert"]>;
         Relationships: [];
       };
       product_occasions: {
@@ -525,6 +543,7 @@ export type Database = {
           reason: string;
           status?: Database["public"]["Tables"]["returns"]["Row"]["status"];
           admin_note?: string | null;
+          resolved_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["returns"]["Insert"]>;
         Relationships: [];
@@ -686,6 +705,44 @@ export type Database = {
         Update: Partial<
           Database["public"]["Tables"]["notification_logs"]["Insert"]
         >;
+        Relationships: [];
+      };
+      audit_logs: {
+        Row: {
+          id: string;
+          admin_user_id: string | null;
+          action: string;
+          entity_type: string;
+          entity_id: string | null;
+          metadata: unknown;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          admin_user_id?: string | null;
+          action: string;
+          entity_type: string;
+          entity_id?: string | null;
+          metadata?: unknown;
+        };
+        Update: Partial<Database["public"]["Tables"]["audit_logs"]["Insert"]>;
+        Relationships: [];
+      };
+      settings: {
+        Row: {
+          id: string;
+          key: string;
+          value: unknown;
+          description: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          key: string;
+          value: unknown;
+          description?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["settings"]["Insert"]>;
         Relationships: [];
       };
       carts: {

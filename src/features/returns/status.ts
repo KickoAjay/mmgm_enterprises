@@ -25,3 +25,17 @@ export const RETURN_REASONS = [
 ] as const;
 
 export type ReturnReason = (typeof RETURN_REASONS)[number];
+
+// Lives here rather than admin-actions.ts — a "use server" file may only
+// export async functions, and this needs to be called from a Client
+// Component to render the action dropdown's options.
+const ALLOWED_TRANSITIONS: Partial<Record<ReturnStatus, ReturnStatus[]>> = {
+  REQUESTED: ["APPROVED", "REJECTED", "INFO_REQUESTED"],
+  INFO_REQUESTED: ["APPROVED", "REJECTED"],
+  APPROVED: ["PICKUP_SCHEDULED", "REJECTED"],
+  PICKUP_SCHEDULED: ["RETURNED"],
+};
+
+export function getAllowedReturnTransitions(current: string): ReturnStatus[] {
+  return ALLOWED_TRANSITIONS[current as ReturnStatus] ?? [];
+}
