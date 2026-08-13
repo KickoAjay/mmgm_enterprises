@@ -1210,3 +1210,25 @@ matters most.
   unaffected — these Pexels URLs live in the same `product_images.url`
   column real uploads would, so an admin can delete/replace any of them
   through the existing admin UI exactly like a genuinely-uploaded photo.
+
+## 29. Hero Slider
+
+`HeroBanner` (`src/components/store/home/hero-banner.tsx`) went from one
+static image to a 5-slide auto-advancing carousel, all 5 images product-
+only (same standard as §28) and sourced the same way. All 5 `<Image>`s
+are mounted simultaneously and crossfaded via `framer-motion`'s `animate`
+prop (opacity `0`↔`1`, 1s ease) rather than mounted/unmounted per slide —
+deliberately, so every image loads once upfront and repeat crossfades
+never wait on a network fetch. A nested `motion.div` per slide runs a
+slow continuous scale (1 → 1.06, ~4s linear) only while that slide is
+current, restarting from 1 each time it becomes active again — this is
+what reads as the "Ken Burns" pan/zoom rather than a static crossfade.
+Auto-advance is a plain `setInterval` (3s), paused on `onMouseEnter` and
+resumed on `onMouseLeave`; clickable dot indicators let a visitor jump to
+any slide directly, which also works while paused.
+
+**The nav bar was already sticky** (`src/components/store/header.tsx`,
+`sticky top-0 z-40`, built in Phase 3) — the announcement bar above it is
+a normal (non-sticky) block that scrolls away first, then the nav row
+sticks to the very top and stays there. Confirmed still correct rather
+than re-implemented from scratch.
