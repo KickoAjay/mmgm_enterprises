@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/db/server";
 import { getAvailabilityMap } from "@/features/products/availability";
+import { getPrimaryImageMap } from "@/features/products/images";
 import type { ProductListItem } from "@/features/products/queries";
 
 export type ProductImage = { id: string; url: string; altText: string | null };
@@ -225,18 +226,22 @@ export async function getSimilarProducts(
   const fabricIds = [
     ...new Set(rows.map((p) => p.fabric_id).filter((id): id is string => !!id)),
   ];
+  const [fabricsResult, imageMap] = await Promise.all([
+    fabricIds.length > 0
+      ? supabase.from("fabrics").select("id, name").in("id", fabricIds)
+      : Promise.resolve({ data: [] }),
+    getPrimaryImageMap(
+      supabase,
+      rows.map((p) => p.id),
+    ),
+  ]);
   const fabricMap = new Map<string, string>();
-  if (fabricIds.length > 0) {
-    const { data: fabrics } = await supabase
-      .from("fabrics")
-      .select("id, name")
-      .in("id", fabricIds);
-    for (const f of fabrics ?? []) fabricMap.set(f.id, f.name);
-  }
+  for (const f of fabricsResult.data ?? []) fabricMap.set(f.id, f.name);
 
   return rows.map((p) => ({
     ...p,
     fabricName: p.fabric_id ? (fabricMap.get(p.fabric_id) ?? null) : null,
+    imageUrl: imageMap.get(p.id) ?? null,
   }));
 }
 

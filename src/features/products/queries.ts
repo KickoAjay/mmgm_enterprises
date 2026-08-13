@@ -1,14 +1,20 @@
 import "server-only";
 import { createClient } from "@/lib/db/server";
+import { getPrimaryImageMap } from "@/features/products/images";
 import type { Database } from "@/types/supabase";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
-export type ProductListItem = ProductRow & { fabricName: string | null };
+export type ProductListItem = ProductRow & {
+  fabricName: string | null;
+  imageUrl: string | null;
+};
 
 // Homepage sections only need the fabric's name — this does a second
 // lookup query instead of `.select("*, fabrics(name)")`, since embedded
 // foreign-table selects need relationship metadata this hand-maintained
 // Database type doesn't model. Revisit once generated types are available.
+// Also attaches each product's primary image (getPrimaryImageMap) so
+// ProductCard can render a real photo instead of MediaPlaceholder.
 async function withFabricNames(
   products: ProductRow[],
 ): Promise<ProductListItem[]> {
@@ -23,18 +29,23 @@ async function withFabricNames(
     ),
   ];
 
+  const [fabricsResult, imageMap] = await Promise.all([
+    fabricIds.length > 0
+      ? supabase.from("fabrics").select("id, name").in("id", fabricIds)
+      : Promise.resolve({ data: [] }),
+    getPrimaryImageMap(
+      supabase,
+      products.map((p) => p.id),
+    ),
+  ]);
+
   const fabricMap = new Map<string, string>();
-  if (fabricIds.length > 0) {
-    const { data: fabrics } = await supabase
-      .from("fabrics")
-      .select("id, name")
-      .in("id", fabricIds);
-    for (const f of fabrics ?? []) fabricMap.set(f.id, f.name);
-  }
+  for (const f of fabricsResult.data ?? []) fabricMap.set(f.id, f.name);
 
   return products.map((p) => ({
     ...p,
     fabricName: p.fabric_id ? (fabricMap.get(p.fabric_id) ?? null) : null,
+    imageUrl: imageMap.get(p.id) ?? null,
   }));
 }
 

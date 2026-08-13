@@ -6,11 +6,13 @@ const nextConfig: NextConfig = {
   // asset requests by default, which otherwise silently breaks hydration.
   allowedDevOrigins: ["192.168.1.14"],
   images: {
-    // No real product photography exists yet (see MediaPlaceholder), but
-    // spec §33 puts uploads in Supabase Storage — pre-configuring this now
-    // means next/image won't silently reject real image URLs once
-    // product_images rows start pointing at Supabase Storage.
-    remotePatterns: [{ protocol: "https", hostname: "**.supabase.co" }],
+    remotePatterns: [
+      // Supabase Storage — admin-uploaded product/return-evidence media.
+      { protocol: "https", hostname: "**.supabase.co" },
+      // Pexels — source of the seeded saree photography (free-license
+      // stock photos) until real product photography exists.
+      { protocol: "https", hostname: "images.pexels.com" },
+    ],
   },
 };
 

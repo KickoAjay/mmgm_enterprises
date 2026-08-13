@@ -1137,3 +1137,60 @@ anywhere in this schema to leak in the first place (Cashfree's hosted
 checkout means this app never touches card data). Total spending is
 computed the same way the admin dashboard computes revenue: sum of
 `grand_total` across orders that aren't `PENDING_PAYMENT` or `CANCELLED`.
+
+## 28. Real Photography (Pexels-sourced)
+
+Not one of the original 15 phases — a follow-up requested once the site
+was otherwise feature-complete, to replace `MediaPlaceholder`'s gradient
+tiles with real saree photography everywhere a product/category appears.
+Sourced from Pexels (free license, no attribution required) via `WebFetch`
+against live search-result pages — every URL was verified to actually
+resolve (`curl` HTTP 200) before being written into `seed.sql`, not
+guessed from a photo ID pattern.
+
+- **`src/features/products/images.ts`** — `getPrimaryImageMap()`, the
+  shared helper every product-list query now calls, mirroring
+  `getAvailabilityMap`'s shape (`availability.ts`): batched by
+  `product_id`, preferring `product_images.is_primary` when set, else the
+  lowest `sort_order`. Before this, only the Phase 5 product-detail
+  gallery ever queried `product_images` at all — `getNewArrivals`,
+  `getBestSellers`, `getTrendingNow`, `getCatalogPage`, and
+  `getSimilarProducts` only selected from `products`, so `ProductCard`
+  (used by every one of them) had no image data to render regardless of
+  what existed in the database.
+- **Every `MediaPlaceholder` call site that had real image data available
+  now branches on it** (`imageUrl ? <Image> : <MediaPlaceholder>`):
+  `ProductCard`, `ShopByCategory`, cart/wishlist line items, and Recently
+  Viewed. `MediaPlaceholder` itself is untouched and still renders
+  wherever a product/category genuinely has no image — it's a fallback,
+  not something being removed.
+- **Hero banner, editorial banners (5 on the homepage), and the Offers
+  section** had no backing DB column and no image plumbing at all before
+  this — these are hardcoded `imageUrl` props/constants at the call site,
+  same as their existing hardcoded headline copy. Not data-driven because
+  there's no product/category they're "about"; an editorial choice, like
+  the text next to them.
+- **`next.config.ts`** gained `images.pexels.com` in `remotePatterns`
+  alongside the existing `**.supabase.co` entry.
+- **Cart/wishlist/Recently-Viewed types gained an `imageUrl` field**
+  (`CartLine`, `WishlistLine`, `RecentProduct`) — none of them carried one
+  before, so the thumbnails in those flows were `MediaPlaceholder` no
+  matter what. Recently Viewed still stores its snapshot in `localStorage`
+  (Phase 5 decision, unchanged) — `imageUrl` is just one more field in
+  that snapshot now.
+- **Seed data**: `supabase/seed.sql` now inserts 2 images for 8 products
+  and 1 for the other 4 (21 rows total, `product_images`), plus
+  `categories.image_url` for all 8 categories — applied directly against
+  the live DB (no pending migration; these are plain data rows, not
+  schema). The `categories` insert changed from `on conflict do nothing`
+  to `on conflict (slug) do update set image_url = excluded.image_url`
+  specifically so re-running seed.sql backfills the photo onto
+  already-existing category rows instead of leaving them null forever;
+  `product_images` has no natural unique key to `on conflict` against, so
+  its idempotency is a `where not exists` guard (only inserts for a
+  product that currently has zero image rows) instead.
+- **Not swapped out**: admin product image management (Phase 11's
+  `product-media` Storage bucket, upload/reorder/set-primary UI) is
+  unaffected — these Pexels URLs live in the same `product_images.url`
+  column real uploads would, so an admin can delete/replace any of them
+  through the existing admin UI exactly like a genuinely-uploaded photo.

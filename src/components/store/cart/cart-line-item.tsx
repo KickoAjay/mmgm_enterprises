@@ -3,6 +3,7 @@
 import { useTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Minus, Plus, X, Heart } from "lucide-react";
 import { MediaPlaceholder } from "@/components/store/media-placeholder";
 import { formatINR } from "@/features/products/format";
@@ -45,12 +46,24 @@ export function CartLineItem({ item }: { item: CartLine }) {
   return (
     <div className="flex gap-4 border-b border-border py-6">
       <Link href={`/sarees/${item.slug}`} className="w-24 shrink-0 sm:w-32">
-        <MediaPlaceholder
-          seed={item.slug}
-          label={item.name}
-          aspect="aspect-[3/4]"
-          className="rounded-sm"
-        />
+        {item.imageUrl ? (
+          <div className="relative aspect-[3/4] overflow-hidden rounded-sm bg-secondary">
+            <Image
+              src={item.imageUrl}
+              alt={item.name}
+              fill
+              sizes="128px"
+              className="object-cover"
+            />
+          </div>
+        ) : (
+          <MediaPlaceholder
+            seed={item.slug}
+            label={item.name}
+            aspect="aspect-[3/4]"
+            className="rounded-sm"
+          />
+        )}
       </Link>
 
       <div className="flex flex-1 flex-col">

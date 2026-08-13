@@ -1,18 +1,30 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { MediaPlaceholder } from "@/components/store/media-placeholder";
+
+// No DB column backs the hero banner (it's not tied to a product or
+// category) — the image is a hardcoded editorial choice, same as the
+// headline copy below it. Sourced from Pexels (free license); swap this
+// constant for real brand photography whenever it exists.
+const HERO_IMAGE_URL =
+  "https://images.pexels.com/photos/27719401/pexels-photo-27719401.jpeg?auto=compress&cs=tinysrgb&w=1920";
 
 export function HeroBanner() {
   return (
     <section className="relative">
-      <MediaPlaceholder
-        seed="hero-banner"
-        aspect="aspect-[4/5] sm:aspect-[16/9] lg:aspect-[21/9]"
-        className="w-full"
-      />
+      <div className="relative aspect-[4/5] w-full sm:aspect-[16/9] lg:aspect-[21/9]">
+        <Image
+          src={HERO_IMAGE_URL}
+          alt="Woman draped in an elegant saree"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
+        />
+      </div>
       <div className="absolute inset-0 flex items-center justify-center bg-black/10">
         <motion.div
           initial={{ opacity: 0, y: 12 }}

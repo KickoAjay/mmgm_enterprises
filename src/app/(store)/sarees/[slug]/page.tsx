@@ -157,6 +157,7 @@ export default async function ProductDetailPage({
           slug: product.slug,
           name: product.name,
           fabricName: product.fabricName,
+          imageUrl: product.images[0]?.url ?? null,
           sellingPrice: product.sellingPrice,
         }}
       />

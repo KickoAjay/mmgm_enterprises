@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/db/server";
 import type { Database } from "@/types/supabase";
 import { getAvailabilityMap } from "@/features/products/availability";
+import { getPrimaryImageMap } from "@/features/products/images";
 import {
   PRICE_BANDS,
   PAGE_SIZE,
@@ -291,13 +292,20 @@ export async function getCatalogPage(
   const fabricNameMap = new Map(
     filterOptions.fabrics.map((f) => [f.id, f.name]),
   );
-  const pageAvailability = await getAvailabilityMap(
-    supabase,
-    rows.map((p) => p.id),
-  );
+  const [pageAvailability, pageImages] = await Promise.all([
+    getAvailabilityMap(
+      supabase,
+      rows.map((p) => p.id),
+    ),
+    getPrimaryImageMap(
+      supabase,
+      rows.map((p) => p.id),
+    ),
+  ]);
   const items: CatalogProduct[] = rows.map((p) => ({
     ...p,
     fabricName: p.fabric_id ? (fabricNameMap.get(p.fabric_id) ?? null) : null,
+    imageUrl: pageImages.get(p.id) ?? null,
     isAvailable: pageAvailability.get(p.id) ?? null,
   }));
 

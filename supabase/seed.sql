@@ -2,30 +2,35 @@
 -- MMGM Enterprises — demo/reference data seed
 --
 -- Realistic lookup values (spec §3/§18) and demo saree products (spec §55).
--- No product images are seeded — there is no real photography yet, so
--- product cards/category tiles render a brand-colored placeholder tile
--- instead (see src/components/store/media-placeholder.tsx). Swap in real
--- photography via product_images once available (Phase 12 admin upload,
--- or direct insert).
+-- Product/category photography is seeded from Pexels (free-license stock
+-- photos) rather than real MMGM Enterprises product shoots, which don't
+-- exist yet — src/components/store/media-placeholder.tsx remains the
+-- fallback for any product/category that ends up with no image. Swap
+-- these for real photography via the admin product-media manager (Phase
+-- 11) whenever it exists.
 --
 -- Idempotent: safe to re-run — every insert is keyed on a unique column
--- with `on conflict do nothing`.
+-- with `on conflict do nothing` (or `do update` where a re-run should
+-- refresh a previously-null value, like categories.image_url).
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
 -- Lookup tables
 -- ---------------------------------------------------------------------------
 
-insert into categories (name, slug, sort_order) values
-  ('Silk Sarees', 'silk-sarees', 1),
-  ('Cotton Sarees', 'cotton-sarees', 2),
-  ('Designer Sarees', 'designer-sarees', 3),
-  ('Wedding Sarees', 'wedding-sarees', 4),
-  ('Party Wear', 'party-wear', 5),
-  ('Handloom', 'handloom', 6),
-  ('Festive', 'festive', 7),
-  ('Daily Wear', 'daily-wear', 8)
-on conflict (slug) do nothing;
+-- image_url uses `do update` (not `do nothing`) so re-running this file
+-- after Phase 4/etc. already created these rows still backfills the
+-- photo added later, rather than leaving existing rows null forever.
+insert into categories (name, slug, sort_order, image_url) values
+  ('Silk Sarees', 'silk-sarees', 1, 'https://images.pexels.com/photos/37054318/pexels-photo-37054318.jpeg?auto=compress&cs=tinysrgb&w=800'),
+  ('Cotton Sarees', 'cotton-sarees', 2, 'https://images.pexels.com/photos/7326221/pexels-photo-7326221.jpeg?auto=compress&cs=tinysrgb&w=800'),
+  ('Designer Sarees', 'designer-sarees', 3, 'https://images.pexels.com/photos/18344146/pexels-photo-18344146.jpeg?auto=compress&cs=tinysrgb&w=800'),
+  ('Wedding Sarees', 'wedding-sarees', 4, 'https://images.pexels.com/photos/37602134/pexels-photo-37602134.jpeg?auto=compress&cs=tinysrgb&w=800'),
+  ('Party Wear', 'party-wear', 5, 'https://images.pexels.com/photos/20957555/pexels-photo-20957555.jpeg?auto=compress&cs=tinysrgb&w=800'),
+  ('Handloom', 'handloom', 6, 'https://images.pexels.com/photos/34474047/pexels-photo-34474047.jpeg?auto=compress&cs=tinysrgb&w=800'),
+  ('Festive', 'festive', 7, 'https://images.pexels.com/photos/33078539/pexels-photo-33078539.jpeg?auto=compress&cs=tinysrgb&w=800'),
+  ('Daily Wear', 'daily-wear', 8, 'https://images.pexels.com/photos/28943588/pexels-photo-28943588.jpeg?auto=compress&cs=tinysrgb&w=800')
+on conflict (slug) do update set image_url = excluded.image_url;
 
 insert into materials (name) values
   ('Pure Silk'), ('Blended Silk'), ('Pure Cotton'), ('Cotton Blend'),
@@ -194,6 +199,45 @@ where (p.sku, o.name) in (
   ('MMGM-TUS-012', 'Office'), ('MMGM-TUS-012', 'Casual')
 )
 on conflict do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Product photography (Pexels, free license) — one or two images per
+-- product. `product_images` has no natural unique key to `on conflict`
+-- against, so idempotency is a `not exists` guard instead: only inserts
+-- for a product that currently has zero image rows, rather than
+-- duplicating on every re-run.
+-- ---------------------------------------------------------------------------
+
+insert into product_images (product_id, url, is_primary, sort_order)
+select p.id, v.url, v.is_primary, v.sort_order
+from products p
+join (
+  values
+    ('MMGM-KAN-001', 'https://images.pexels.com/photos/17113983/pexels-photo-17113983.jpeg?auto=compress&cs=tinysrgb&w=1200', true, 0),
+    ('MMGM-KAN-001', 'https://images.pexels.com/photos/37054322/pexels-photo-37054322.jpeg?auto=compress&cs=tinysrgb&w=1200', false, 1),
+    ('MMGM-COT-002', 'https://images.pexels.com/photos/7693907/pexels-photo-7693907.jpeg?auto=compress&cs=tinysrgb&w=1200', true, 0),
+    ('MMGM-COT-002', 'https://images.pexels.com/photos/34368242/pexels-photo-34368242.jpeg?auto=compress&cs=tinysrgb&w=1200', false, 1),
+    ('MMGM-BAN-003', 'https://images.pexels.com/photos/11629757/pexels-photo-11629757.jpeg?auto=compress&cs=tinysrgb&w=1200', true, 0),
+    ('MMGM-BAN-003', 'https://images.pexels.com/photos/37880205/pexels-photo-37880205.jpeg?auto=compress&cs=tinysrgb&w=1200', false, 1),
+    ('MMGM-GEO-004', 'https://images.pexels.com/photos/8710793/pexels-photo-8710793.jpeg?auto=compress&cs=tinysrgb&w=1200', true, 0),
+    ('MMGM-GEO-004', 'https://images.pexels.com/photos/33067044/pexels-photo-33067044.jpeg?auto=compress&cs=tinysrgb&w=1200', false, 1),
+    ('MMGM-LIN-005', 'https://images.pexels.com/photos/37054331/pexels-photo-37054331.jpeg?auto=compress&cs=tinysrgb&w=1200', true, 0),
+    ('MMGM-LIN-005', 'https://images.pexels.com/photos/32597576/pexels-photo-32597576.jpeg?auto=compress&cs=tinysrgb&w=1200', false, 1),
+    ('MMGM-PRC-006', 'https://images.pexels.com/photos/30188036/pexels-photo-30188036.jpeg?auto=compress&cs=tinysrgb&w=1200', true, 0),
+    ('MMGM-PRC-006', 'https://images.pexels.com/photos/34210956/pexels-photo-34210956.jpeg?auto=compress&cs=tinysrgb&w=1200', false, 1),
+    ('MMGM-ORG-007', 'https://images.pexels.com/photos/28135787/pexels-photo-28135787.jpeg?auto=compress&cs=tinysrgb&w=1200', true, 0),
+    ('MMGM-HAN-008', 'https://images.pexels.com/photos/34652673/pexels-photo-34652673.jpeg?auto=compress&cs=tinysrgb&w=1200', true, 0),
+    ('MMGM-HAN-008', 'https://images.pexels.com/photos/10527093/pexels-photo-10527093.jpeg?auto=compress&cs=tinysrgb&w=1200', false, 1),
+    ('MMGM-EMB-009', 'https://images.pexels.com/photos/30004204/pexels-photo-30004204.jpeg?auto=compress&cs=tinysrgb&w=1200', true, 0),
+    ('MMGM-EMB-009', 'https://images.pexels.com/photos/33276621/pexels-photo-33276621.jpeg?auto=compress&cs=tinysrgb&w=1200', false, 1),
+    ('MMGM-TRA-010', 'https://images.pexels.com/photos/28943474/pexels-photo-28943474.jpeg?auto=compress&cs=tinysrgb&w=1200', true, 0),
+    ('MMGM-CHA-011', 'https://images.pexels.com/photos/29026116/pexels-photo-29026116.jpeg?auto=compress&cs=tinysrgb&w=1200', true, 0),
+    ('MMGM-TUS-012', 'https://images.pexels.com/photos/34433855/pexels-photo-34433855.jpeg?auto=compress&cs=tinysrgb&w=1200', true, 0),
+    ('MMGM-TUS-012', 'https://images.pexels.com/photos/8099719/pexels-photo-8099719.jpeg?auto=compress&cs=tinysrgb&w=1200', false, 1)
+) as v(sku, url, is_primary, sort_order) on v.sku = p.sku
+where not exists (
+  select 1 from product_images pi where pi.product_id = p.id
+);
 
 -- ---------------------------------------------------------------------------
 -- Starter inventory row per product (required — products has no default

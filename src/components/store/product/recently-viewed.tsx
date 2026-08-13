@@ -2,6 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { MediaPlaceholder } from "@/components/store/media-placeholder";
 import { SectionHeading } from "@/components/store/section-heading";
 import { formatINR } from "@/features/products/format";
@@ -13,6 +14,7 @@ export type RecentProduct = {
   slug: string;
   name: string;
   fabricName: string | null;
+  imageUrl: string | null;
   sellingPrice: number;
 };
 
@@ -80,11 +82,23 @@ export function RecentlyViewed({ current }: { current: RecentProduct }) {
             href={`/sarees/${item.slug}`}
             className="w-40 shrink-0 sm:w-48"
           >
-            <MediaPlaceholder
-              seed={item.slug}
-              label={item.name}
-              className="rounded-sm"
-            />
+            {item.imageUrl ? (
+              <div className="relative aspect-[3/4] overflow-hidden rounded-sm bg-secondary">
+                <Image
+                  src={item.imageUrl}
+                  alt={item.name}
+                  fill
+                  sizes="192px"
+                  className="object-cover"
+                />
+              </div>
+            ) : (
+              <MediaPlaceholder
+                seed={item.slug}
+                label={item.name}
+                className="rounded-sm"
+              />
+            )}
             <p className="mt-2 text-sm text-foreground">{item.name}</p>
             {item.fabricName ? (
               <p className="text-meta text-muted-foreground">

@@ -1,6 +1,7 @@
 import "server-only";
 import { getCartContext } from "@/features/cart/cart-session";
 import { getAvailabilityMap } from "@/features/products/availability";
+import { getPrimaryImageMap } from "@/features/products/images";
 
 export type CartLine = {
   cartItemId: string;
@@ -9,6 +10,7 @@ export type CartLine = {
   name: string;
   sku: string;
   fabricName: string | null;
+  imageUrl: string | null;
   unitPrice: number;
   originalPrice: number;
   quantity: number;
@@ -42,10 +44,11 @@ export async function getCartSummary(): Promise<CartSummary> {
   if (!cartItems || cartItems.length === 0) return EMPTY_CART;
 
   const productIds = cartItems.map((ci) => ci.product_id);
-  const [{ data: products }, fabrics, availMap] = await Promise.all([
+  const [{ data: products }, fabrics, availMap, imageMap] = await Promise.all([
     supabase.from("products").select("*").in("id", productIds),
     supabase.from("fabrics").select("id, name"),
     getAvailabilityMap(supabase, productIds),
+    getPrimaryImageMap(supabase, productIds),
   ]);
 
   const productMap = new Map((products ?? []).map((p) => [p.id, p]));
@@ -69,6 +72,7 @@ export async function getCartSummary(): Promise<CartSummary> {
       fabricName: product.fabric_id
         ? (fabricNameMap.get(product.fabric_id) ?? null)
         : null,
+      imageUrl: imageMap.get(product.id) ?? null,
       unitPrice: product.selling_price,
       originalPrice: product.original_price,
       quantity: ci.quantity,

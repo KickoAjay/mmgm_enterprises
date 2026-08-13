@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Star } from "lucide-react";
 import { MediaPlaceholder } from "@/components/store/media-placeholder";
 import { WishlistButton } from "@/components/store/wishlist-button";
@@ -11,7 +12,7 @@ import type { ProductListItem } from "@/features/products/queries";
 export function ProductCard({
   product,
 }: {
-  product: ProductListItem & { isAvailable?: boolean | null };
+  product: ProductListItem & { isAvailable?: boolean | null; imageUrl?: string | null };
 }) {
   const discount = discountPercent(
     product.original_price,
@@ -23,11 +24,23 @@ export function ProductCard({
     <div className="group flex flex-col">
       <div className="relative">
         <Link href={`/sarees/${product.slug}`} className="block">
-          <MediaPlaceholder
-            seed={product.slug}
-            label={product.name}
-            className="rounded-sm"
-          />
+          {product.imageUrl ? (
+            <div className="relative aspect-[3/4] overflow-hidden rounded-sm bg-secondary">
+              <Image
+                src={product.imageUrl}
+                alt={product.name}
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                className="object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+            </div>
+          ) : (
+            <MediaPlaceholder
+              seed={product.slug}
+              label={product.name}
+              className="rounded-sm"
+            />
+          )}
         </Link>
         <WishlistButton productId={product.id} />
         {soldOut ? (

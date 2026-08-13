@@ -31,6 +31,7 @@ export default async function Home() {
         ctaLabel="Explore Silk"
         ctaHref="/shop?fabric=silk"
         seed="edit-silk"
+        imageUrl="https://images.pexels.com/photos/7920055/pexels-photo-7920055.jpeg?auto=compress&cs=tinysrgb&w=1200"
       />
 
       <ProductGrid title="New Arrivals" products={newArrivals} />
@@ -42,6 +43,7 @@ export default async function Home() {
         ctaLabel="Explore Wedding"
         ctaHref="/shop?category=wedding-sarees"
         seed="edit-wedding"
+        imageUrl="https://images.pexels.com/photos/38980385/pexels-photo-38980385.jpeg?auto=compress&cs=tinysrgb&w=1200"
         reverse
       />
 
@@ -52,6 +54,7 @@ export default async function Home() {
         ctaLabel="Explore Festive"
         ctaHref="/shop?category=festive"
         seed="edit-festive"
+        imageUrl="https://images.pexels.com/photos/27918896/pexels-photo-27918896.jpeg?auto=compress&cs=tinysrgb&w=1200"
       />
 
       <ProductGrid title="Best Sellers" products={bestSellers} />
@@ -63,6 +66,7 @@ export default async function Home() {
         ctaLabel="Explore Handloom"
         ctaHref="/shop?category=handloom"
         seed="edit-handloom"
+        imageUrl="https://images.pexels.com/photos/34621854/pexels-photo-34621854.jpeg?auto=compress&cs=tinysrgb&w=1200"
         reverse
       />
 
@@ -73,6 +77,7 @@ export default async function Home() {
         ctaLabel="Explore Daily Wear"
         ctaHref="/shop?category=daily-wear"
         seed="edit-everyday"
+        imageUrl="https://images.pexels.com/photos/20158863/pexels-photo-20158863.jpeg?auto=compress&cs=tinysrgb&w=1200"
       />
 
       <OffersSection />

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { MediaPlaceholder } from "@/components/store/media-placeholder";
 import { cn } from "@/lib/utils";
 
@@ -9,6 +10,7 @@ export function EditorialBanner({
   ctaLabel,
   ctaHref,
   seed,
+  imageUrl,
   reverse = false,
 }: {
   eyebrow: string;
@@ -17,6 +19,7 @@ export function EditorialBanner({
   ctaLabel: string;
   ctaHref: string;
   seed: string;
+  imageUrl?: string;
   reverse?: boolean;
 }) {
   return (
@@ -27,11 +30,23 @@ export function EditorialBanner({
           reverse && "lg:[&>*:first-child]:order-2",
         )}
       >
-        <MediaPlaceholder
-          seed={seed}
-          aspect="aspect-[4/3]"
-          className="rounded-sm"
-        />
+        {imageUrl ? (
+          <div className="relative aspect-[4/3] overflow-hidden rounded-sm bg-secondary">
+            <Image
+              src={imageUrl}
+              alt={title}
+              fill
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              className="object-cover"
+            />
+          </div>
+        ) : (
+          <MediaPlaceholder
+            seed={seed}
+            aspect="aspect-[4/3]"
+            className="rounded-sm"
+          />
+        )}
         <div className="flex flex-col items-start px-2">
           <span className="text-meta font-semibold tracking-[0.2em] text-primary uppercase">
             {eyebrow}

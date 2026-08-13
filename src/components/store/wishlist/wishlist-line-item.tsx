@@ -2,6 +2,7 @@
 
 import { useTransition, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { X } from "lucide-react";
 import { MediaPlaceholder } from "@/components/store/media-placeholder";
 import { Button } from "@/components/ui/button";
@@ -46,11 +47,23 @@ export function WishlistLineItem({ item }: { item: WishlistLine }) {
     <div className="flex flex-col">
       <div className="relative">
         <Link href={`/sarees/${item.slug}`} className="block">
-          <MediaPlaceholder
-            seed={item.slug}
-            label={item.name}
-            className="rounded-sm"
-          />
+          {item.imageUrl ? (
+            <div className="relative aspect-[3/4] overflow-hidden rounded-sm bg-secondary">
+              <Image
+                src={item.imageUrl}
+                alt={item.name}
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                className="object-cover"
+              />
+            </div>
+          ) : (
+            <MediaPlaceholder
+              seed={item.slug}
+              label={item.name}
+              className="rounded-sm"
+            />
+          )}
         </Link>
         <button
           type="button"

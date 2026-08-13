@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/db/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getAvailabilityMap } from "@/features/products/availability";
+import { getPrimaryImageMap } from "@/features/products/images";
 
 export type WishlistLine = {
   wishlistItemId: string;
@@ -9,6 +10,7 @@ export type WishlistLine = {
   slug: string;
   name: string;
   fabricName: string | null;
+  imageUrl: string | null;
   sellingPrice: number;
   originalPrice: number;
   isAvailable: boolean | null;
@@ -37,10 +39,11 @@ export async function getWishlistItems(): Promise<WishlistLine[]> {
   if (!wishlistItems || wishlistItems.length === 0) return [];
 
   const productIds = wishlistItems.map((wi) => wi.product_id);
-  const [{ data: products }, fabrics, availMap] = await Promise.all([
+  const [{ data: products }, fabrics, availMap, imageMap] = await Promise.all([
     supabase.from("products").select("*").in("id", productIds),
     supabase.from("fabrics").select("id, name"),
     getAvailabilityMap(supabase, productIds),
+    getPrimaryImageMap(supabase, productIds),
   ]);
 
   const productMap = new Map((products ?? []).map((p) => [p.id, p]));
@@ -60,6 +63,7 @@ export async function getWishlistItems(): Promise<WishlistLine[]> {
       fabricName: product.fabric_id
         ? (fabricNameMap.get(product.fabric_id) ?? null)
         : null,
+      imageUrl: imageMap.get(product.id) ?? null,
       sellingPrice: product.selling_price,
       originalPrice: product.original_price,
       isAvailable: availMap.get(product.id) ?? null,

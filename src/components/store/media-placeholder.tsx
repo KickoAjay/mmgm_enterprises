@@ -1,10 +1,11 @@
 import { cn } from "@/lib/utils";
 
-// No real product/category photography exists yet — this renders a
-// tasteful brand-colored placeholder tile instead of a broken image or a
-// mismatched stock photo. The gradient is deterministic per `seed` (e.g. a
-// product slug) so the same item always gets the same treatment. Swap in
-// real photography via product_images/categories.image_url once available.
+// Fallback for whenever a product/category genuinely has no image (most
+// now have real Pexels-sourced photography, seeded via product_images/
+// categories.image_url — see docs/architecture.md §28) — a mismatched
+// stock photo would be worse than a tasteful placeholder tile. The
+// gradient is deterministic per `seed` (e.g. a product slug) so the same
+// item always gets the same treatment.
 const GRADIENTS: [string, string][] = [
   ["var(--brand-burgundy)", "var(--brand-plum)"],
   ["var(--brand-rose)", "var(--brand-dusty-pink)"],
