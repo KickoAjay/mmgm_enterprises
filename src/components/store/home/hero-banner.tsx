@@ -101,7 +101,7 @@ export function HeroBanner() {
             MMGM Enterprises
           </span>
           <h1 className="mt-4 font-serif text-hero text-white">
-            Elegance Woven Into Every Thread
+            Elegance Women Into Every Thread
           </h1>
           <p className="mt-4 max-w-md text-white/85">
             Discover timeless sarees curated for every occasion.
