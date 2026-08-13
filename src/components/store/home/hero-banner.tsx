@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 // No DB column backs the hero banner (it's not tied to a product or
 // category) — the image is a hardcoded editorial choice, same as the
 // headline copy below it. Sourced from Pexels (free license); swap this
-// constant for real brand photography whenever it exists.
+// constant for real brand photography whenever it exists. Pure product
+// photography only (fabric close-up, no people) — see docs/architecture.md
+// §28 for why lifestyle/model photography was deliberately avoided.
 const HERO_IMAGE_URL =
-  "https://images.pexels.com/photos/27719401/pexels-photo-27719401.jpeg?auto=compress&cs=tinysrgb&w=1920";
+  "https://images.pexels.com/photos/10317127/pexels-photo-10317127.jpeg?auto=compress&cs=tinysrgb&w=1920";
 
 export function HeroBanner() {
   return (
@@ -18,14 +20,14 @@ export function HeroBanner() {
       <div className="relative aspect-[4/5] w-full sm:aspect-[16/9] lg:aspect-[21/9]">
         <Image
           src={HERO_IMAGE_URL}
-          alt="Woman draped in an elegant saree"
+          alt="Close-up of richly patterned silk saree fabric"
           fill
           priority
           sizes="100vw"
           className="object-cover"
         />
       </div>
-      <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+      <div className="absolute inset-0 flex items-center justify-center bg-black/30">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}

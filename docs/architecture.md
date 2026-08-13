@@ -1138,7 +1138,7 @@ checkout means this app never touches card data). Total spending is
 computed the same way the admin dashboard computes revenue: sum of
 `grand_total` across orders that aren't `PENDING_PAYMENT` or `CANCELLED`.
 
-## 28. Real Photography (Pexels-sourced)
+## 28. Real Photography (Pexels-sourced, product-only)
 
 Not one of the original 15 phases — a follow-up requested once the site
 was otherwise feature-complete, to replace `MediaPlaceholder`'s gradient
@@ -1147,6 +1147,22 @@ Sourced from Pexels (free license, no attribution required) via `WebFetch`
 against live search-result pages — every URL was verified to actually
 resolve (`curl` HTTP 200) before being written into `seed.sql`, not
 guessed from a photo ID pattern.
+
+**Revised mid-implementation**: the first pass used lifestyle/model
+photography (women wearing sarees) — the far more plentiful category on
+free stock sites for this subject. Replaced immediately on request with
+pure product photography instead: every image is now a folded/draped
+saree stack, a fabric close-up, or a textile-store display — verified
+per-photo (not just by search term) to contain no person, hand, face, or
+mannequin anywhere in frame. Genuinely saree-specific stock shots without
+a person in them are scarce (most searches return exclusively
+lifestyle/model results), so the final set leans on silk/satin fabric
+close-ups and folded-saree/textile-store shots for color coverage across
+all 12 products' named colors, reserving the handful of shots explicitly
+labeled as sarees/saris (a folded Kanchipuram stack, a sari draped over a
+chair, a saree fabric macro shot) for the highest-visibility placements —
+hero banner and category tiles — where a saree's identity as a garment
+matters most.
 
 - **`src/features/products/images.ts`** — `getPrimaryImageMap()`, the
   shared helper every product-list query now calls, mirroring

@@ -7,31 +7,31 @@ const OFFERS = [
     label: "Under ₹999",
     href: "/shop?maxPrice=999",
     imageUrl:
-      "https://images.pexels.com/photos/7920188/pexels-photo-7920188.jpeg?auto=compress&cs=tinysrgb&w=800",
+      "https://images.pexels.com/photos/20531149/pexels-photo-20531149.jpeg?auto=compress&cs=tinysrgb&w=800",
   },
   {
     label: "Under ₹1,999",
     href: "/shop?maxPrice=1999",
     imageUrl:
-      "https://images.pexels.com/photos/7920194/pexels-photo-7920194.jpeg?auto=compress&cs=tinysrgb&w=800",
+      "https://images.pexels.com/photos/9824794/pexels-photo-9824794.jpeg?auto=compress&cs=tinysrgb&w=800",
   },
   {
     label: "Under ₹2,999",
     href: "/shop?maxPrice=2999",
     imageUrl:
-      "https://images.pexels.com/photos/28316406/pexels-photo-28316406.jpeg?auto=compress&cs=tinysrgb&w=800",
+      "https://images.pexels.com/photos/30243795/pexels-photo-30243795.jpeg?auto=compress&cs=tinysrgb&w=800",
   },
   {
     label: "Premium Sarees",
     href: "/shop?category=designer-sarees",
     imageUrl:
-      "https://images.pexels.com/photos/17040892/pexels-photo-17040892.jpeg?auto=compress&cs=tinysrgb&w=800",
+      "https://images.pexels.com/photos/8793891/pexels-photo-8793891.jpeg?auto=compress&cs=tinysrgb&w=800",
   },
   {
     label: "Wedding Collection",
     href: "/shop?category=wedding-sarees",
     imageUrl:
-      "https://images.pexels.com/photos/13031574/pexels-photo-13031574.jpeg?auto=compress&cs=tinysrgb&w=800",
+      "https://images.pexels.com/photos/14944287/pexels-photo-14944287.jpeg?auto=compress&cs=tinysrgb&w=800",
   },
 ];
 
