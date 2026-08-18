@@ -27,7 +27,11 @@ export async function generateMetadata({
 }) {
   const { slug } = await params;
   const product = await getProductDetail(slug);
-  if (!product) return {};
+  // Matches the noindex Next.js already injects for the notFound() render
+  // below — without this, the root layout's site-wide `index: true`
+  // would otherwise sit right alongside it as a second, conflicting
+  // <meta name="robots"> tag.
+  if (!product) return { robots: { index: false, follow: false } };
 
   const description =
     product.shortDescription ??

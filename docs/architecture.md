@@ -1430,3 +1430,116 @@ product/catalog pages — wishlist button, add-to-cart, delivery check,
 recently-viewed — is already an isolated `"use client"` island reading
 its own state, not the page itself; confirmed while investigating the
 ISR question above).
+
+## 32. Testing + Production Deployment (implemented in Phase 15)
+
+**Testing.** No test framework existed anywhere in the project before
+this phase. Added Vitest (`vitest.config.mts`, `pnpm test` / `pnpm
+test:watch`) rather than Jest — no React-component rendering is being
+tested (no jsdom needed), just pure business logic, and Vitest's Vite
+-native TS/ESM handling needs zero Babel/ts-jest configuration for that.
+`server-only` throws by design when imported outside Next's own bundler
+(hit this in Phase 10 too) — `test/empty-module.ts` stubs it via a
+`resolve.alias` in the Vitest config so files that import it defensively
+(`src/lib/security/rate-limit.ts`) can still be unit tested.
+
+Coverage is deliberately scoped to pure, side-effect-free logic — the
+highest-risk-of-silent-breakage, easiest-to-verify-in-isolation code in
+the project, not an attempt at integration/e2e coverage (which would
+need a real Supabase project and a browser, neither reliable to drive
+from this environment):
+
+- Order/return/refund status transition maps (`getAllowedNextStatuses`,
+  `getAllowedReturnTransitions`, `getNextRefundStatus`) — the state
+  machines gating what an admin can do to an order/return/refund next;
+  a wrong entry here is an admin silently able (or unable) to make a
+  transition that spec §29/§36/§37 forbid/require.
+- `formatINR`/`discountPercent` (`features/products/format.ts`) — every
+  price on the site runs through these.
+- `checkRateLimit` (Phase 14's rate limiter) — the sliding-window/reset
+  logic itself, not `getClientIp` (a thin, untestable-in-isolation
+  wrapper around `next/headers`).
+- `jsonLdScript`/`productJsonLd`/`breadcrumbJsonLd` (Phase 14's
+  structured data) — specifically the `<` escaping that keeps a product
+  name from ever being able to break out of its `<script>` tag.
+- `loginSchema`/`registerSchema` (Zod validation) — password length,
+  email format, mobile regex, password-confirmation matching.
+
+38 tests, all passing; wired into a new GitHub Actions workflow
+(`.github/workflows/ci.yml`) alongside `typecheck`/`lint`/`build` on
+every push/PR to `main`. The workflow needs no repository secrets —
+`pnpm build` was verified to succeed with `.env.local` entirely absent
+(see the `sitemap.ts` fix below), so CI stays meaningful even before
+anyone configures deployment secrets in GitHub.
+
+**Error/loading states (spec §49/§50).** None of `error.tsx`,
+`not-found.tsx`, or `loading.tsx` existed anywhere before this phase —
+any unhandled error rendered Next's bare default error UI, any missing
+route or `notFound()` call rendered Next's bare default 404, and every
+route transition had no interim UI beyond the odd inline
+`useTransition`-driven button spinner already built per-component.
+Added:
+
+- `src/app/error.tsx` — root boundary, catches errors anywhere in the
+  storefront tree (a same-segment `error.tsx` can't catch its own
+  layout's errors, only a parent one can, so this has to sit above
+  `(store)/layout.tsx`, not inside it). Never renders `error.message`/
+  `.stack` — spec §49's "never show technical stack traces to
+  customers," and the client-side half of what Next already does
+  server-side (redacting real error messages from the client in
+  production).
+- `src/app/admin/error.tsx` — same rule, admin-branded, sits below the
+  root one so admin errors get admin chrome instead of storefront chrome.
+- `src/app/not-found.tsx` — root 404, branded, used both for unmatched
+  routes and every explicit `notFound()` call.
+- `src/app/(store)/sarees/loading.tsx`, `.../sarees/[slug]/loading.tsx`,
+  `src/app/admin/(dashboard)/loading.tsx` — skeleton placeholders shaped
+  to match each real page's layout (grid columns, gallery/info split,
+  stat-card row) so there's no layout shift when real content swaps in.
+  Covers spec §50's "skeleton loaders"/"admin table loading" — one
+  shared skeleton at the `(dashboard)` segment level covers every admin
+  table route (products/orders/customers/returns/refunds/reports/team)
+  rather than a bespoke one per route. Button-loading/duplicate-click
+  prevention was already handled per-component via `useTransition`
+  since early phases, not new here.
+
+**A real finding from testing this**: `notFound()` in this Next.js
+version (16, running under its newer "Cache Components" streaming model
+— see `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/
+not-found.md`, "Calling notFound() after streaming has started") no
+longer produces a genuine `404` HTTP status when called from inside a
+Server Component's render path, which is how the product detail page
+(`sarees/[slug]/page.tsx`) has called it since Phase 5. Every dynamic
+route streams a static shell at `200` first under this model, so by the
+time `notFound()` throws, the status is already committed — confirmed
+live (`curl -D -`) against an unknown product slug: `200 OK`, not `404`,
+serving the branded not-found UI. Next's own mitigation is a `<meta
+name="robots" content="noindex">` tag injected automatically wherever
+`notFound()` renders — confirmed present. The one gap this phase found
+and fixed: the product page's own `generateMetadata` returned `{}` for a
+missing product, so the root layout's site-wide `index: true` sat right
+next to Next's injected `noindex` as a second, contradicting robots meta
+tag. Fixed by returning `{ robots: { index: false, follow: false } }`
+instead — both tags now agree (still two tags, not fully deduplicated,
+since the injected one isn't something userland code controls, but no
+longer in conflict). Getting a true `404` status code back would mean
+moving the existence check into `proxy.ts` per the doc's own guidance,
+which means a DB query on every request matching its matcher (currently
+just session refresh) — a real architectural change, not a bug fix, and
+out of scope for this pass; flagged here rather than attempted
+half-verified.
+
+**Production deployment (spec §54).** `.env.example` already listed
+every variable with no real secrets committed (confirmed, unchanged).
+Rewrote `README.md` (previously untouched `create-next-app` boilerplate
+— still referenced the Geist font and had no mention of Supabase,
+Cashfree, Resend, or this project at all) into a real setup guide: env
+var reference table, the migration files in application order, the
+`/admin/setup` first-admin bootstrap flow, all `package.json` scripts,
+and a Vercel deployment checklist (env vars, `NEXT_PUBLIC_SITE_URL`,
+Cashfree webhook URL, Resend domain verification, running migrations
+before first deploy). `next build` was verified to succeed both with the
+real `.env.local` and with it entirely absent (temporarily moved aside
+and restored) — confirming spec §54's "no local-only dependencies" and
+that a first-time clone with no env configured yet still builds cleanly
+rather than crashing opaquely.

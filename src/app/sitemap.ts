@@ -10,24 +10,33 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 const STATIC_ROUTES = ["/", "/sarees", "/track-order"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const supabase = createServiceClient();
-  const { data: products } = await supabase
-    .from("products")
-    .select("slug, updated_at")
-    .neq("status", "ARCHIVED");
-
   const staticEntries: MetadataRoute.Sitemap = STATIC_ROUTES.map((path) => ({
     url: `${siteUrl}${path}`,
     changeFrequency: path === "/" ? "daily" : "hourly",
     priority: path === "/" ? 1 : 0.8,
   }));
 
-  const productEntries: MetadataRoute.Sitemap = (products ?? []).map((p) => ({
-    url: `${siteUrl}/sarees/${p.slug}`,
-    lastModified: p.updated_at ?? undefined,
-    changeFrequency: "daily",
-    priority: 0.9,
-  }));
+  // This runs at build time (sitemap.xml is statically generated) — a
+  // missing/misconfigured Supabase env var (e.g. a CI run with no
+  // Supabase secrets configured) would otherwise fail the entire
+  // production build over a sitemap, not just omit product URLs from it.
+  // Degrade to the static routes only rather than crashing the build.
+  try {
+    const supabase = createServiceClient();
+    const { data: products } = await supabase
+      .from("products")
+      .select("slug, updated_at")
+      .neq("status", "ARCHIVED");
 
-  return [...staticEntries, ...productEntries];
+    const productEntries: MetadataRoute.Sitemap = (products ?? []).map((p) => ({
+      url: `${siteUrl}/sarees/${p.slug}`,
+      lastModified: p.updated_at ?? undefined,
+      changeFrequency: "daily",
+      priority: 0.9,
+    }));
+
+    return [...staticEntries, ...productEntries];
+  } catch {
+    return staticEntries;
+  }
 }
