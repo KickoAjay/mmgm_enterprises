@@ -24,10 +24,20 @@ const CSP = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
-  // Allows the dev server to be reached from other devices on the LAN
-  // (e.g. http://192.168.1.14:3000) — Next.js blocks cross-origin dev
-  // asset requests by default, which otherwise silently breaks hydration.
-  allowedDevOrigins: ["192.168.1.14"],
+  // Allows the dev server to be reached from other devices on the LAN —
+  // Next.js blocks cross-origin dev asset requests by default, which
+  // otherwise silently breaks hydration: the initial HTML still renders
+  // (so the page looks present), but every JS chunk request gets
+  // blocked, so React never hydrates and nothing below the first
+  // server-rendered paint (or anything CSS-in-JS/client-only) works —
+  // this is what "homepage shows only the hero image" and "nav isn't
+  // sticky" actually were, confirmed via the `next dev` console showing
+  // "Blocked cross-origin request to Next.js dev resource" for a LAN IP
+  // not on this list. DHCP reassigns this machine's LAN IP over time
+  // (this file has already needed updating once), so if this starts
+  // happening again after a network change, check the terminal for the
+  // actual blocked origin and add it here.
+  allowedDevOrigins: ["192.168.1.14", "10.151.170.33"],
   images: {
     remotePatterns: [
       // Supabase Storage — admin-uploaded product/return-evidence media.
@@ -38,25 +48,33 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
-    return [
+    const headers = [
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       {
-        source: "/:path*",
-        headers: [
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          {
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
-          },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=63072000; includeSubDomains; preload",
-          },
-          { key: "Content-Security-Policy", value: CSP },
-        ],
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=()",
       },
     ];
+
+    // CSP and HSTS only in production — the CSP's connect-src has no
+    // allowance for `ws:`/the LAN-IP origin Next's dev server's HMR
+    // socket needs, so applying it in dev breaks hot-reload even after
+    // fixing allowedDevOrigins above; HSTS is meaningless (and actively
+    // unhelpful for local http:// testing) outside a real deployed
+    // domain anyway.
+    if (process.env.NODE_ENV === "production") {
+      headers.push(
+        {
+          key: "Strict-Transport-Security",
+          value: "max-age=63072000; includeSubDomains; preload",
+        },
+        { key: "Content-Security-Policy", value: CSP },
+      );
+    }
+
+    return [{ source: "/:path*", headers }];
   },
 };
 
