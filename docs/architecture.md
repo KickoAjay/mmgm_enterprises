@@ -707,7 +707,7 @@ CashfreeCheckout (client)            → loads Cashfree's hosted checkout
   exits as a no-op. Only `service_role` can execute the function — revoked
   from `PUBLIC`, since it marks payments as paid.
 - **Webhook idempotency has a second layer**: `payment_transactions.
-  cashfree_event_id` is unique, and the webhook route
+cashfree_event_id` is unique, and the webhook route
   (`src/app/api/webhooks/cashfree/route.ts`) derives that id as a SHA-256
   hash of the raw request body — a retried delivery resends identical
   bytes, hashes to the same id, and the insert fails before any side
@@ -715,7 +715,7 @@ CashfreeCheckout (client)            → loads Cashfree's hosted checkout
   a content hash instead avoids depending on a header name that couldn't
   be confirmed without live traffic to inspect.)
 - **Signature verification** (`src/lib/cashfree/webhook.ts`) reads the
-  *raw* request body via `request.text()` before any JSON parsing —
+  _raw_ request body via `request.text()` before any JSON parsing —
   computing the HMAC over a re-serialized `JSON.parse` result can silently
   produce different bytes than what Cashfree signed, which would make
   verification flaky in a way that's hard to notice locally.
@@ -771,14 +771,14 @@ were tested to reach — until a domain is verified (§24d).
 
 ### 24b. Templates and what triggers them
 
-| Template                             | Sent from                                       | Trigger                                                             |
-| ------------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------- |
-| `templates/test-email.ts`             | `POST /api/send-email`                           | Manual, dev-only (§24c)                                               |
-| `templates/welcome.ts`                | `src/lib/auth/notify.ts`                         | `signUpAction` (`src/lib/auth/actions.ts`), right after `auth.signUp` succeeds |
-| `templates/order-confirmation.ts`     | `src/features/payments/notify.ts`                | `confirmPayment()` "confirmed" transition                             |
-| `templates/payment-confirmation.ts`   | `src/features/payments/notify.ts`                | same, alongside order confirmation                                    |
-| `templates/admin-new-order.ts`        | `src/features/payments/notify.ts`                | same, only if `ADMIN_NOTIFICATION_EMAIL` is set                       |
-| `templates/order-status-update.ts`    | `sendOrderStatusUpdateNotification()` (unwired)  | **nothing yet** — see §24e                                            |
+| Template                            | Sent from                                       | Trigger                                                                        |
+| ----------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------ |
+| `templates/test-email.ts`           | `POST /api/send-email`                          | Manual, dev-only (§24c)                                                        |
+| `templates/welcome.ts`              | `src/lib/auth/notify.ts`                        | `signUpAction` (`src/lib/auth/actions.ts`), right after `auth.signUp` succeeds |
+| `templates/order-confirmation.ts`   | `src/features/payments/notify.ts`               | `confirmPayment()` "confirmed" transition                                      |
+| `templates/payment-confirmation.ts` | `src/features/payments/notify.ts`               | same, alongside order confirmation                                             |
+| `templates/admin-new-order.ts`      | `src/features/payments/notify.ts`               | same, only if `ADMIN_NOTIFICATION_EMAIL` is set                                |
+| `templates/order-status-update.ts`  | `sendOrderStatusUpdateNotification()` (unwired) | **nothing yet** — see §24e                                                     |
 
 `sendOrderConfirmedNotifications(orderId, cashfreePaymentId)`
 (`src/features/payments/notify.ts`) is the single entry point for the
@@ -949,7 +949,7 @@ yet — Phase 11.
   policies enforce; read back via short-lived signed URLs generated
   server-side (`getMyReturnDetail`), never a public bucket URL. Path
   convention doubles as the access-control key: `storage.foldername(name))[1]
-  = auth.uid()::text`.
+= auth.uid()::text`.
 - **One item per return request**, not a multi-item cart-like form — the
   schema's `returns.reason` is a single text field per return (not
   per-item), and real return flows are almost always "return this one
@@ -995,7 +995,7 @@ create policy "First admin can self-bootstrap" on admin_users
 — after the first row exists, that branch is permanently false for
 everyone; every admin after that is created by an existing SUPER_ADMIN
 via `/admin/team` (`createAdminAction`, which promotes an existing
-*registered customer account* rather than minting new credentials).
+_registered customer account_ rather than minting new credentials).
 
 `requireAdmin()` (`src/lib/auth/session.ts`) checks whether `admin_users`
 is genuinely empty (via service-role, since a non-admin can't even see
@@ -1008,7 +1008,7 @@ session (`requireUser()`) — sign up on the storefront first, then visit
 **Live-verified, not just read from the RLS policy SQL**: created a real
 Supabase auth user via the admin API, inserted an `admin_users` row for
 them via service-role (simulating what the bootstrap policy lets the
-*real* first admin do), signed in to get a real access token, and
+_real_ first admin do), signed in to get a real access token, and
 confirmed via direct REST calls that this admin token can update any
 order's status and insert `order_status_history`, while the same request
 with only the anon key returns an empty result set (RLS-filtered, not a
@@ -1052,14 +1052,14 @@ just a flag with no effect elsewhere in the app.
 
 - `src/features/products/admin-queries.ts` / `admin-actions.ts` — full
   CRUD. **Never a hard DELETE** — `order_items.product_id` is `ON DELETE
-  RESTRICT` by design (a sold product's history must survive), so
+RESTRICT` by design (a sold product's history must survive), so
   "Archive" (`products.status = 'ARCHIVED'`) is the only removal path,
   consistent with how the storefront has treated "deleted" products since
   Phase 4.
 - `discount_amount` is computed automatically as
   `max(0, originalPrice - sellingPrice)` rather than exposed as its own
   form field — it's a real column but nothing in the app has ever read it
-  independently of `discount_percent` (a *generated* column computed
+  independently of `discount_percent` (a _generated_ column computed
   directly from the two prices, Phase 4), so a separate admin-entered
   value for it would just be a second, driftable source of truth.
 - **`product-media` is a public storage bucket** (migration
@@ -1232,3 +1232,71 @@ any slide directly, which also works while paused.
 a normal (non-sticky) block that scrolls away first, then the nav row
 sticks to the very top and stays there. Confirmed still correct rather
 than re-implemented from scratch.
+
+## 30. Reports + Notifications (implemented in Phase 13)
+
+Spec §31 splits the admin dashboard into a card row (Phase 11, done) and
+a chart section — Daily Sales, Monthly Sales, Revenue, Orders, Top
+Selling Sarees, Category Performance, Revenue Trends — deferred to this
+phase (§27e / dashboard.ts's own comment). The "Notifications" half of
+this phase's name was already closed out in Phase 11: `updateOrderAction`
+(`src/features/orders/admin-actions.ts`) calls
+`sendOrderStatusUpdateNotification` on every SHIPPED/DELIVERED/CANCELLED
+transition, which was the one remaining gap flagged back in §24e. Nothing
+left to wire there — this phase is charts only.
+
+**Consolidating 7 named charts into 5 panels.** The spec lists Daily
+Sales, Monthly Sales, Revenue, and Revenue Trends as four separate items,
+but Revenue/Revenue Trends share the same underlying series as Daily/
+Monthly Sales (order count) — just a second axis on the same time bucket.
+Splitting them into four charts would mean two pairs of charts plotting
+the same x-axis twice each. Instead, `/admin/reports`
+(`src/app/admin/(dashboard)/reports/page.tsx`) renders:
+
+- **Daily Sales & Revenue** (last 30 days) — combo chart, `SalesTrendChart`
+- **Monthly Sales & Revenue Trends** (last 12 months) — same component,
+  monthly buckets
+- **Orders by Status** — donut, covers the spec's "Orders" chart as a
+  status-distribution breakdown rather than a third count-over-time
+  series (which would just be Daily/Monthly Sales again)
+- **Category Performance** — revenue by category, bar chart
+- **Top Selling Sarees** — top 10 products by revenue, horizontal bar
+
+`SalesTrendChart` (`src/components/admin/reports/sales-trend-chart.tsx`)
+is a `recharts` `ComposedChart`: bars for order count on a left axis,
+a line for revenue on a right axis, same two-metric-one-timeline idea
+used for both the daily and monthly panels (just different bucket
+counts/labels).
+
+**Data layer** (`src/features/admin/reports.ts`, `getReportsData()`)
+fetches `orders` and `order_items` broad (same RLS-full-read pattern as
+`getDashboardStats`) and aggregates in JS — there's no PostgREST
+group-by, and the existing dashboard card query already established this
+as the project's convention at this data volume. Category names are
+resolved via two more flat queries (`products` then `categories`, joined
+in JS via `Map`s) rather than PostgREST's embedded-resource select
+syntax (`products(categories(name))`) — the hand-maintained `Database`
+type in `src/types/supabase.ts` has no `Relationships` metadata for the
+client to type-check an embedded select against, so every other admin
+query in this codebase (`getAdminOrders`, `getAdminTeam`, etc.) already
+uses flat queries + manual joins, and this follows the same pattern.
+Orders in `PENDING_PAYMENT`/`CANCELLED` are excluded from every revenue
+figure, matching `getDashboardStats`; the order-status donut is the one
+exception and counts every status, since its entire purpose is to show
+the distribution across all of them.
+
+**Charting library**: `recharts` (direct `pnpm add`, not via
+`shadcn add chart` — the `ui.shadcn.com` component registry wasn't
+reachable from this environment, only the plain npm registry was, so the
+chart panels are hand-written against `recharts` directly rather than
+through shadcn's `ChartContainer` wrapper). All colors reference the
+existing CSS custom properties (`var(--primary)`, `var(--brand-*)`) so
+the charts stay in sync with the rest of the design system automatically.
+
+Verified: `pnpm typecheck`, `pnpm lint`, and `pnpm build` all pass, the
+`/admin/reports` route is registered, an unauthenticated request 307s to
+`/admin/login` cleanly, and the actual `orders`/`order_items`/`products`/
+`categories` queries were run end-to-end against the live database signed
+in as the real admin account — all return successfully under RLS (0 rows,
+since no real order has been placed in this environment yet; the charts
+render their empty state rather than erroring).
