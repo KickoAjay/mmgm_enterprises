@@ -24,6 +24,7 @@ export type SendEmailParams = {
   subject: string;
   html: string;
   text: string;
+  replyTo?: string;
 };
 
 export type SendEmailResult = { success: true } | { success: false; error: string };
@@ -41,6 +42,9 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
   if (!emailAddressSchema.safeParse(params.to).success) {
     return { success: false, error: "Invalid recipient email address" };
   }
+  if (params.replyTo && !emailAddressSchema.safeParse(params.replyTo).success) {
+    return { success: false, error: "Invalid reply-to email address" };
+  }
 
   const from = process.env.EMAIL_FROM ?? "MMGM Enterprises <onboarding@resend.dev>";
   try {
@@ -50,6 +54,7 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
       subject: params.subject,
       html: params.html,
       text: params.text,
+      ...(params.replyTo ? { replyTo: params.replyTo } : {}),
     });
     if (error) return { success: false, error: error.message };
     return { success: true };

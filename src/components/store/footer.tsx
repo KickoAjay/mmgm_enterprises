@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { Mail, Phone, MessageCircle } from "lucide-react";
+import { Mail, MapPin, Phone, MessageCircle } from "lucide-react";
+import {
+  COMPANY_ADDRESS_LINES,
+  COMPANY_EMAIL,
+  COMPANY_PHONE_DISPLAY,
+  COMPANY_PHONE_TEL,
+} from "@/lib/constants";
 
 // lucide-react's brand/social icons (Instagram, Facebook, YouTube) were
 // removed in this major version, so social links use plain text instead.
@@ -71,7 +77,7 @@ export function Footer() {
             MMGM ENTERPRISES
           </span>
           <p className="text-meta mt-3 text-muted-foreground">
-            Premium sarees for every occasion — modern Indian fashion, handloom
+            Refurbished premium sarees for every occasion — modern Indian fashion, handloom
             heritage, digital-first boutique.
           </p>
         </div>
@@ -98,23 +104,33 @@ export function Footer() {
 
           <div className="text-meta mt-6 flex flex-col gap-2 text-muted-foreground">
             <a
-              href="mailto:care@mmgmenterprises.com"
+              href={`mailto:${COMPANY_EMAIL}`}
               className="flex items-center gap-2 hover:text-primary"
             >
-              <Mail className="size-4" /> care@mmgmenterprises.com
+              <Mail className="size-4 shrink-0" /> {COMPANY_EMAIL}
             </a>
             <a
-              href="tel:+911234567890"
+              href={`tel:${COMPANY_PHONE_TEL}`}
               className="flex items-center gap-2 hover:text-primary"
             >
-              <Phone className="size-4" /> +91 12345 67890
+              <Phone className="size-4 shrink-0" /> {COMPANY_PHONE_DISPLAY}
             </a>
             <a
-              href="https://wa.me/911234567890"
+              href={`https://wa.me/${COMPANY_PHONE_TEL.replace("+", "")}`}
               className="flex items-center gap-2 hover:text-primary"
             >
-              <MessageCircle className="size-4" /> WhatsApp Us
+              <MessageCircle className="size-4 shrink-0" /> WhatsApp Us
             </a>
+            <div className="flex items-start gap-2">
+              <MapPin className="mt-0.5 size-4 shrink-0" />
+              <span>
+                {COMPANY_ADDRESS_LINES.map((line) => (
+                  <span key={line} className="block">
+                    {line}
+                  </span>
+                ))}
+              </span>
+            </div>
           </div>
         </div>
       </div>

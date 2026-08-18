@@ -176,15 +176,20 @@ export default async function ProductDetailPage({
             ) : null}
           </div>
 
-          <span
-            className={
-              soldOut
-                ? "text-meta mt-3 inline-block w-fit rounded-sm bg-foreground px-2 py-1 font-semibold text-background"
-                : "text-meta mt-3 inline-block w-fit rounded-sm bg-brand-emerald px-2 py-1 font-semibold text-white"
-            }
-          >
-            {soldOut ? "Out of Stock" : "In Stock"}
-          </span>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span
+              className={
+                soldOut
+                  ? "text-meta inline-block w-fit rounded-sm bg-foreground px-2 py-1 font-semibold text-background"
+                  : "text-meta inline-block w-fit rounded-sm bg-brand-emerald px-2 py-1 font-semibold text-white"
+              }
+            >
+              {soldOut ? "Out of Stock" : "In Stock"}
+            </span>
+            <span className="text-meta inline-block w-fit rounded-sm border border-primary/30 px-2 py-1 font-semibold text-primary">
+              Quality-Checked &amp; Refurbished
+            </span>
+          </div>
 
           <div className="mt-6">
             <ProductActions productId={product.id} soldOut={soldOut} />

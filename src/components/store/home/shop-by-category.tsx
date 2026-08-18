@@ -4,8 +4,8 @@ import { getShopByCategoryTiles } from "@/features/products/queries";
 import { MediaPlaceholder } from "@/components/store/media-placeholder";
 import { SectionHeading } from "@/components/store/section-heading";
 
-export async function ShopByCategory() {
-  const categories = await getShopByCategoryTiles();
+export async function ShopByCategory({ limit }: { limit?: number } = {}) {
+  const categories = await getShopByCategoryTiles(limit);
   if (categories.length === 0) return null;
 
   return (

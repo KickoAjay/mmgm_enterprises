@@ -4,16 +4,18 @@ import type { ProductListItem } from "@/features/products/queries";
 
 export function ProductGrid({
   title,
+  subtitle,
   products,
 }: {
   title: string;
+  subtitle?: string;
   products: ProductListItem[];
 }) {
   if (products.length === 0) return null;
 
   return (
     <section className="mx-auto max-w-7xl px-6 py-16">
-      <SectionHeading title={title} />
+      <SectionHeading title={title} subtitle={subtitle} />
       <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 lg:grid-cols-4">
         {products.map((product) => (
           <ProductCard key={product.id} product={product} />

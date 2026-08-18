@@ -35,7 +35,8 @@ export default async function SareesPage({
       <div className="mb-6 flex flex-col gap-2">
         <h1 className="font-serif text-section text-foreground">Sarees</h1>
         <p className="text-sm text-muted-foreground">
-          {result.totalCount} {result.totalCount === 1 ? "saree" : "sarees"}
+          {result.totalCount} {result.totalCount === 1 ? "saree" : "sarees"} — quality-checked &amp;
+          refurbished
         </p>
         <form
           action={BASE_PATH}

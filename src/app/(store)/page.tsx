@@ -34,7 +34,11 @@ export default async function Home() {
         imageUrl="https://images.pexels.com/photos/10317113/pexels-photo-10317113.jpeg?auto=compress&cs=tinysrgb&w=1200"
       />
 
-      <ProductGrid title="New Arrivals" products={newArrivals} />
+      <ProductGrid
+        title="New Arrivals"
+        subtitle="Beautifully refurbished sarees, freshly quality-checked and newly listed."
+        products={newArrivals}
+      />
 
       <EditorialBanner
         eyebrow="Wedding Edit"

@@ -1543,3 +1543,97 @@ real `.env.local` and with it entirely absent (temporarily moved aside
 and restored) — confirming spec §54's "no local-only dependencies" and
 that a first-time clone with no env configured yet still builds cleanly
 rather than crashing opaquely.
+
+## 33. Site-Wide Polish Pass (broken links, contact, refurbished messaging)
+
+A post-launch cleanup pass: the footer/nav had been linking to pages that
+were never built (expected during phased development per nav-links.ts's
+own comment — every phase up to now targeted a specific route, and
+`/collections`, `/offers`, `/contact`, `/faq`, `/shipping`, `/privacy-
+policy`, `/terms`, `/cookie-policy` were never one of them), the hero
+headline had a typo, and the business's actual positioning — refurbished
+sarees, not new stock — wasn't stated anywhere a customer would see it
+before now.
+
+**Eight new pages**, closing every remaining footer/nav 404:
+
+- `/collections` and `/offers` reuse existing homepage components
+  (`ShopByCategory`, now taking an optional `limit` prop so this page can
+  show more than the homepage's 8-tile teaser; `OffersSection` as-is)
+  rather than building new grids — same data, same images, zero design
+  risk.
+- `/contact` — company details plus a working form. `src/features/
+  contact/actions.ts` validates with a new `contactSchema`
+  (`src/validations/contact.ts`), rate-limits at 5/hour per IP (reusing
+  Phase 14's `checkRateLimit`), and sends via the existing `sendEmail`
+  (now supporting an optional `replyTo` — set to the customer's own
+  address, so a reply from Gmail goes straight back to them) with a new
+  `buildContactMessageEmail` template. Logged through the same
+  `logEmailDelivery` every other transactional email uses. A new
+  `Textarea` primitive (`src/components/ui/textarea.tsx`) was hand-
+  written to match `Input`'s existing styling — shadcn's registry
+  (`ui.shadcn.com`) isn't reachable from this environment (same issue
+  hit adding the Phase 13 chart component), only plain npm is.
+- `/faq`, `/shipping`, `/privacy-policy`, `/terms`, `/cookie-policy` —
+  static content pages, real (non-lorem-ipsum) copy written for this
+  business specifically. FAQ leads with "Are your sarees new?" —
+  the most direct place for the refurbished disclosure to live in full.
+
+**Contact details centralized**: `src/lib/constants.ts` now holds the
+company email/phone/address once (`COMPANY_EMAIL`, `COMPANY_PHONE_*`,
+`COMPANY_ADDRESS_LINES`) instead of the footer hardcoding them inline —
+the footer already had the correct email/phone (apparently edited by
+hand before this pass) but was missing the address entirely; added it,
+and pointed both the footer and the new `/contact` page at the same
+constants so they can never drift apart.
+
+**Refurbished-saree messaging** added in five places total, deliberately
+not more: the footer's existing tagline, the hero subtext ("Premium,
+quality-checked refurbished sarees curated for every occasion"), the
+homepage's New Arrivals section (new optional `subtitle` prop on
+`ProductGrid`), the `/sarees` listing header, and a small badge next to
+the in-stock/out-of-stock indicator on the product detail page. Wording
+throughout says "refurbished"/"quality-checked" explicitly rather than
+implying new condition, per spec's own instruction not to.
+
+**Hero banner fixes**: the headline read "Elegance Women Into Every
+Thread" — a typo for "Woven," present since the Phase-13-era slider
+rewrite, now corrected. The overlay changed from a flat `bg-black/30` to
+a gradient (`from-black/45 via-black/50 to-black/45`) plus a text-shadow
+on the heading block — the flat 30%-opacity wash didn't reliably darken
+every one of the 5 rotating slides enough for white text to stay
+readable against lighter fabric photography. Images and the crossfade/
+Ken-Burns mechanics from Phase 13 are unchanged.
+
+**Sticky nav — re-verified, not changed.** Re-confirmed `sticky top-0
+z-40` on the header's nav row (`src/components/store/header.tsx`,
+correct since Phase 3), and checked for anything that silently breaks
+`position: sticky` — an ancestor with `overflow: hidden`, `transform`,
+or `contain` — in `globals.css` and both layout files; found none.
+`curl`-verified the class is present in the shipped HTML. Left as
+`sticky` rather than switching to `fixed` (which the request's wording
+—"add padding so content starts below the fixed navbar"— would imply):
+`fixed` removes the header from document flow entirely, which would
+require hardcoding the announcement-bar-plus-nav height as a manual
+content offset (fragile — breaks if the announcement bar ever wraps to
+two lines) to reproduce the exact same "pins once you'd scroll past it"
+behavior `sticky` already gives for free. If the nav still doesn't
+appear fixed in practice, the likely cause is a stale deployment/cache
+rather than this code — nothing else in the render path touches its
+positioning.
+
+**Known gap, not fixed here**: the `/contact` form is fully built and
+wired correctly, but message delivery to `mmgmenterprises.office@
+gmail.com` will fail until Resend's sending domain is verified — this
+was flagged back in the original Resend integration work (§24d) and
+confirmed still true here by directly testing the Resend API with the
+real key: `403 validation_error — "You can only send testing emails to
+your own email address"`. Resend's sandbox sender (`onboarding@
+resend.dev`, still in use — `EMAIL_FROM` in `.env.local`) can only
+deliver to the Resend account's own registered address, not to
+`mmgmenterprises.office@gmail.com` or anyone else, until a domain is
+verified at resend.com/domains and `EMAIL_FROM` is updated to use it (no
+code change needed beyond that — every template already reads
+`EMAIL_FROM` at send time). Until then, a real visitor's contact-form
+submission returns "Something went wrong sending your message" — a
+truthful failure, not a silent one, but not a working inbox either.

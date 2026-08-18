@@ -90,21 +90,26 @@ export function HeroBanner() {
         ))}
       </div>
 
-      <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30">
+      {/* A stronger, gradient-shaped overlay (darkest behind the text,
+          fading at the very top/bottom) reads reliably over every slide
+          regardless of how light or busy that photo is — the flat 30%
+          black wash this replaced let white text wash out against
+          lighter fabric photography. */}
+      <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-b from-black/45 via-black/50 to-black/45">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="flex max-w-xl flex-col items-center px-6 text-center"
+          className="flex max-w-xl flex-col items-center px-6 text-center [text-shadow:0_2px_12px_rgb(0_0_0_/_0.45)]"
         >
-          <span className="text-meta font-semibold tracking-[0.2em] text-white/80 uppercase">
+          <span className="text-meta font-semibold tracking-[0.2em] text-white/90 uppercase">
             MMGM Enterprises
           </span>
           <h1 className="mt-4 font-serif text-hero text-white">
-            Elegance Women Into Every Thread
+            Elegance Woven Into Every Thread
           </h1>
-          <p className="mt-4 max-w-md text-white/85">
-            Discover timeless sarees curated for every occasion.
+          <p className="mt-4 max-w-md text-white/90">
+            Premium, quality-checked refurbished sarees curated for every occasion.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Button asChild size="lg" className="px-6 tracking-wide uppercase">
