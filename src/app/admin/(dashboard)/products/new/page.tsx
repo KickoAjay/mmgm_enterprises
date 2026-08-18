@@ -3,7 +3,7 @@ import { getProductFormOptions } from "@/features/products/admin-queries";
 import { ProductForm } from "@/components/admin/product-form";
 
 export const metadata = {
-  title: "Add Product | MMGM Admin",
+  title: "Add Product",
 };
 
 export default async function NewProductPage() {

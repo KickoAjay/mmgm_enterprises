@@ -4,7 +4,7 @@ import { CreateAdminForm } from "@/components/admin/create-admin-form";
 import { ToggleAdminActiveButton } from "@/components/admin/toggle-admin-active-button";
 
 export const metadata = {
-  title: "Team | MMGM Admin",
+  title: "Team",
 };
 
 // getAdminTeam/getAdminRoles both call requireRole(["SUPER_ADMIN"])

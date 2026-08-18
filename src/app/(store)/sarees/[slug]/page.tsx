@@ -14,6 +14,9 @@ import { ProductInfoSections } from "@/components/store/product/product-info-sec
 import { RecentlyViewed } from "@/components/store/product/recently-viewed";
 import { WishlistButton } from "@/components/store/wishlist-button";
 import { ProductCarousel } from "@/components/store/product-carousel";
+import { breadcrumbJsonLd, jsonLdScript, productJsonLd } from "@/lib/seo/structured-data";
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 type Params = { slug: string };
 
@@ -26,12 +29,28 @@ export async function generateMetadata({
   const product = await getProductDetail(slug);
   if (!product) return {};
 
+  const description =
+    product.shortDescription ??
+    product.description?.slice(0, 160) ??
+    `Shop ${product.name} at MMGM Enterprises.`;
+  const imageUrl = product.images[0]?.url;
+
   return {
-    title: `${product.name} | MMGM Enterprises`,
-    description:
-      product.shortDescription ??
-      product.description?.slice(0, 160) ??
-      `Shop ${product.name} at MMGM Enterprises.`,
+    title: product.name,
+    description,
+    alternates: { canonical: `/sarees/${product.slug}` },
+    openGraph: {
+      type: "website",
+      title: product.name,
+      description,
+      images: imageUrl ? [{ url: imageUrl }] : undefined,
+    },
+    twitter: {
+      card: imageUrl ? "summary_large_image" : "summary",
+      title: product.name,
+      description,
+      images: imageUrl ? [imageUrl] : undefined,
+    },
   };
 }
 
@@ -51,8 +70,40 @@ export default async function ProductDetailPage({
 
   const soldOut = product.isAvailable === false;
 
+  const breadcrumbItems = [
+    { name: "Home", url: siteUrl },
+    { name: "Sarees", url: `${siteUrl}/sarees` },
+    ...(product.categoryName && product.categorySlug
+      ? [{ name: product.categoryName, url: `${siteUrl}/shop?category=${product.categorySlug}` }]
+      : []),
+    { name: product.name, url: `${siteUrl}/sarees/${product.slug}` },
+  ];
+
   return (
     <main className="mx-auto max-w-7xl px-6 py-10">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLdScript(
+            productJsonLd({
+              name: product.name,
+              description: product.description,
+              sku: product.sku,
+              brand: product.brand,
+              images: product.images,
+              sellingPrice: product.sellingPrice,
+              isAvailable: product.isAvailable,
+              avgRating: product.avgRating,
+              reviewCount: product.reviewCount,
+              url: `${siteUrl}/sarees/${product.slug}`,
+            }),
+          ),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(breadcrumbJsonLd(breadcrumbItems)) }}
+      />
       <nav className="text-meta flex items-center gap-2 text-muted-foreground">
         <Link href="/" className="hover:text-primary">
           Home

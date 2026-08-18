@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ArchiveProductButton } from "@/components/admin/archive-product-button";
 
 export const metadata = {
-  title: "Products | MMGM Admin",
+  title: "Products",
 };
 
 export default async function AdminProductsPage({

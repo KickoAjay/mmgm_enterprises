@@ -9,7 +9,7 @@ import { ReturnStatusForm } from "@/components/admin/return-status-form";
 import { InitiateRefundForm } from "@/components/admin/initiate-refund-form";
 
 export const metadata = {
-  title: "Return Details | MMGM Admin",
+  title: "Return Details",
 };
 
 export default async function AdminReturnDetailPage({

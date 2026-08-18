@@ -8,7 +8,7 @@ import { formatOrderDate } from "@/features/orders/format";
 import { formatINR } from "@/features/products/format";
 
 export const metadata = {
-  title: "Return Details | MMGM Enterprises",
+  title: "Return Details",
 };
 
 export default async function ReturnDetailPage({

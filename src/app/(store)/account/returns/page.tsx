@@ -5,7 +5,7 @@ import { RETURN_STATUS_LABELS, type ReturnStatus } from "@/features/returns/stat
 import { formatOrderDate } from "@/features/orders/format";
 
 export const metadata = {
-  title: "My Returns | MMGM Enterprises",
+  title: "My Returns",
 };
 
 export default async function ReturnsPage() {

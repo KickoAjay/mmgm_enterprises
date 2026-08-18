@@ -3,7 +3,7 @@ import { formatINR } from "@/features/products/format";
 import { StatCard } from "@/components/admin/stat-card";
 
 export const metadata = {
-  title: "Dashboard | MMGM Admin",
+  title: "Dashboard",
 };
 
 export default async function AdminDashboardPage() {

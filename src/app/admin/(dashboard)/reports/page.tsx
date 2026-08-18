@@ -6,7 +6,7 @@ import { TopSellingChart } from "@/components/admin/reports/top-selling-chart";
 import { CategoryPerformanceChart } from "@/components/admin/reports/category-performance-chart";
 
 export const metadata = {
-  title: "Reports | MMGM Admin",
+  title: "Reports",
 };
 
 export default async function AdminReportsPage() {

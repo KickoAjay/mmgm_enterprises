@@ -10,7 +10,7 @@ import { formatINR } from "@/features/products/format";
 import { ToggleCustomerActiveButton } from "@/components/admin/toggle-customer-active-button";
 
 export const metadata = {
-  title: "Customer Profile | MMGM Admin",
+  title: "Customer Profile",
 };
 
 export default async function AdminCustomerDetailPage({

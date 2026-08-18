@@ -8,7 +8,7 @@ import { OrderStatusTimeline } from "@/components/store/orders/order-status-time
 import { Button } from "@/components/ui/button";
 
 export const metadata = {
-  title: "Order Details | MMGM Enterprises",
+  title: "Order Details",
 };
 
 export default async function OrderDetailPage({

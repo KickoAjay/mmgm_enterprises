@@ -15,10 +15,31 @@ const fraunces = Fraunces({
   display: "swap",
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const siteName = "MMGM Enterprises";
+const defaultDescription =
+  "Discover timeless sarees curated for every occasion at MMGM Enterprises.";
+
 export const metadata: Metadata = {
-  title: "MMGM Enterprises | Premium Sarees for Every Occasion",
-  description:
-    "Discover timeless sarees curated for every occasion at MMGM Enterprises.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: `${siteName} | Premium Sarees for Every Occasion`,
+    template: `%s | ${siteName}`,
+  },
+  description: defaultDescription,
+  openGraph: {
+    type: "website",
+    siteName,
+    title: `${siteName} | Premium Sarees for Every Occasion`,
+    description: defaultDescription,
+    url: siteUrl,
+  },
+  twitter: {
+    card: "summary",
+    title: `${siteName} | Premium Sarees for Every Occasion`,
+    description: defaultDescription,
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

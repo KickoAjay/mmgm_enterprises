@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient } from "@/lib/db/server";
+import { createPublicClient } from "@/lib/db/public";
 import type { Database } from "@/types/supabase";
 import { getAvailabilityMap } from "@/features/products/availability";
 import { getPrimaryImageMap } from "@/features/products/images";
@@ -36,7 +36,7 @@ async function namesToIds(
   names: string[],
 ): Promise<string[]> {
   if (names.length === 0) return [];
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from(table)
     .select("id, name")
@@ -46,7 +46,7 @@ async function namesToIds(
 
 async function categorySlugToId(slug?: string): Promise<string | null> {
   if (!slug) return null;
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("categories")
     .select("id")
@@ -68,7 +68,7 @@ async function searchTaxonomyIds(q: string) {
   };
   if (words.length === 0) return empty;
 
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const orExpr = words.map((w) => `name.ilike.%${w}%`).join(",");
 
   const [fabrics, colors, patterns, categories] = await Promise.all([
@@ -87,7 +87,7 @@ async function searchTaxonomyIds(q: string) {
 }
 
 async function searchProductIds(q: string): Promise<string[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const taxonomy = await searchTaxonomyIds(q);
   const matched = new Set<string>();
 
@@ -126,7 +126,7 @@ async function productIdsForOccasions(
   occasionIds: string[],
 ): Promise<string[]> {
   if (occasionIds.length === 0) return [];
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("product_occasions")
     .select("product_id")
@@ -135,7 +135,7 @@ async function productIdsForOccasions(
 }
 
 async function getFilterOptions(): Promise<FilterOptions> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const [categories, fabrics, colors, patterns, occasions] = await Promise.all([
     supabase
       .from("categories")
@@ -160,7 +160,7 @@ async function getFilterOptions(): Promise<FilterOptions> {
 export async function getCatalogPage(
   params: CatalogSearchParams,
 ): Promise<CatalogResult> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
 
   const q = params.q?.trim() ?? "";
   const sort: SortOption = (params.sort as SortOption) || "recommended";

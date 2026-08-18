@@ -5,7 +5,7 @@ import { formatINR } from "@/features/products/format";
 import { Button } from "@/components/ui/button";
 
 export const metadata = {
-  title: "Shopping Bag | MMGM Enterprises",
+  title: "Shopping Bag",
 };
 
 export default async function CartPage() {

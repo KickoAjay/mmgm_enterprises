@@ -1300,3 +1300,133 @@ Verified: `pnpm typecheck`, `pnpm lint`, and `pnpm build` all pass, the
 in as the real admin account — all return successfully under RLS (0 rows,
 since no real order has been placed in this environment yet; the charts
 render their empty state rather than erroring).
+
+## 31. Security + SEO + Performance (implemented in Phase 14)
+
+Spec §42/§43/§44. Most of §42 (Security) was already satisfied by earlier
+phases and just gets called out here rather than rebuilt: Supabase Auth
+handles password hashing/session security, RBAC has been in place since
+Phase 11, every write path validates with Zod, the Supabase client
+parameterizes every query (no raw SQL string-building anywhere), React
+escapes all rendered content (no `dangerouslySetInnerHTML` in the
+codebase before this phase — the two exceptions this phase adds are
+JSON-LD `<script>` tags, the standard safe pattern for structured data,
+serialized through `jsonLdScript()` which escapes `<` so no field can
+break out of the tag), Next.js Server Actions already reject cross-origin
+POSTs (built-in Origin-header CSRF protection since Next 13.4, nothing to
+add), audit logs have covered every admin mutation since Phase 11, and
+the Cashfree webhook has verified its HMAC signature since Phase 8. No
+`NEXT_PUBLIC_`-prefixed secret ever existed — the anon key is meant to be
+public (RLS is what actually protects data), and the service-role/
+Cashfree-secret/Resend-key env vars have never had that prefix.
+
+What this phase actually adds:
+
+**Storage upload validation** (migration `20260810190000_phase14_
+security.sql`) — both `product-media` and `return-evidence` buckets took
+direct-from-browser uploads with only client-side MIME/size checks
+(`product-media-manager.tsx`, `return-image-upload.tsx`), which a direct
+API call bypasses entirely. Added `file_size_limit`/`allowed_mime_types`
+at the bucket level — the one server-side enforcement point available
+for a direct-to-Storage upload pattern. `product-media`'s bucket-wide
+limit has to cover its larger asset (50MB video ceiling, since Storage
+has one size limit per bucket, not per-MIME-type) — the tighter 5MB
+image cap stays client-side only, a known/accepted gap for an
+authenticated-admin-only bucket.
+
+**Rate limiting** (`src/lib/security/rate-limit.ts`) — an in-memory
+fixed-window limiter wired into every auth action that's a classic abuse
+target: `signInAction`/`adminSignInAction` (10/15min per IP), `signUpAction`
+(5/hr), `requestPasswordResetAction` and `resendVerificationEmailAction`
+(5/hr each). Explicitly documented as a single-instance, best-effort
+defense (a fresh `Map` per cold start, no cross-instance sharing) rather
+than pretending it's Redis-backed — real enough to blunt naive scripted
+abuse, not a claim of bulletproof protection. Keyed by IP
+(`x-forwarded-for`, trustworthy behind Vercel's edge) rather than email,
+so it throttles brute-forcing many accounts from one source without
+needing per-account state.
+
+**Security headers** (`next.config.ts`) — `X-Frame-Options: DENY`,
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-
+when-cross-origin`, a restrictive `Permissions-Policy`, HSTS, and a CSP.
+The CSP keeps `script-src`/`style-src` at `'unsafe-inline'` rather than a
+nonce-based policy — Framer Motion animates via inline `style` attributes
+across the storefront, and Cashfree's own checkout SDK
+(`sdk.cashfree.com`, loaded via `next/script` in `cashfree-checkout.tsx`)
+is a third `<script>` source outside this app's control. Tightening to
+nonces would mean per-request nonce plumbing through every script tag
+including Cashfree's, and there's no browser available in this
+environment to verify that doesn't silently break checkout — the
+highest-stakes flow in the app. Everything else in the policy
+(`default-src 'self'`, `frame-ancestors 'none'`, `object-src 'none'`,
+scoped `connect-src`/`img-src`) is a real restriction with no such
+tradeoff. Verified live: all headers present on a production build
+(`pnpm build && pnpm start`), including on `/`.
+
+**SEO** — root layout (`src/app/layout.tsx`) gained `metadataBase`, a
+title template (`%s | MMGM Enterprises`), and default Open Graph/Twitter
+metadata; `src/app/admin/layout.tsx` got its own template (`%s | MMGM
+Admin`) plus `robots: { index: false }` (already had the latter). Every
+page's hardcoded `"X | MMGM Enterprises"` / `"X | MMGM Admin"` title
+string was stripped to just `"X"` so the template supplies the suffix
+once instead of doubling it. The product detail page
+(`sarees/[slug]/page.tsx`) gained a canonical URL, Open Graph/Twitter
+images from the product's own primary photo, and two JSON-LD blocks
+(`src/lib/seo/structured-data.ts`) — `Product` (price, availability,
+aggregate rating when reviews exist) and `BreadcrumbList` matching the
+page's own visible breadcrumb. The `/sarees` listing canonicalizes every
+filter/sort/page combination back to the bare `/sarees` URL, since
+they're the same content in a different order and would otherwise look
+like near-duplicate pages to a crawler. `src/app/sitemap.ts` lists the
+canonical static routes plus every non-archived product's PDP (verified
+live — 12 real products present); category browsing is deliberately
+excluded since it lives at `/shop?category=slug`, a filtered view of
+`/sarees` rather than a distinct canonical page. `src/app/robots.ts`
+disallows `/admin`, `/account`, `/cart`, `/checkout`, `/api` and points
+at the sitemap. Verified live: `curl /robots.txt` and `/sitemap.xml` both
+render correctly as static routes (`○` in the build output), and a real
+product page's rendered HTML was checked for the canonical link, both
+JSON-LD blocks, and the OG title.
+
+**Performance — what was done, and what wasn't.** `features/products/
+catalog.ts` and `detail.ts` (the public catalog/PDP data layer) read
+through a new `createPublicClient()` (`src/lib/db/public.ts`) — a plain
+anon-key client with no cookie adapter — instead of the session-scoped
+`createClient()` every other admin/account query uses. These two files
+have no `auth.uid()`-dependent logic anywhere (every query already
+carries an explicit `status = 'ACTIVE'` filter matching the RLS policy
+itself), so an anonymous read and a logged-in customer's read return
+identical rows; swapping the client removes an unnecessary cookie-store
+read per query and fixes a real architectural mismatch (public catalog
+data was coupled to request cookies for no reason).
+
+The original goal was to go further and mark `/sarees` and `/sarees/
+[slug]` as ISR (`export const revalidate = 60`) now that their own data
+layer no longer touches `cookies()`. That was implemented, then reverted
+after `pnpm build` showed both routes still rendering as `ƒ` (fully
+dynamic) — `Header` (`src/components/store/header.tsx`, shared by every
+storefront page via `(store)/layout.tsx`) calls `getCurrentUser()` and
+`getCartItemCount()` on every render to show the login/account link and
+cart-badge count, and without Partial Prerendering enabled, one dynamic
+API call anywhere in a route's component tree forces the entire route
+dynamic — there's no partial caching of "everything except the header."
+Shipping `export const revalidate = 60` while the build output proved it
+had no effect would have been a misleading comment, so it was pulled
+back out rather than left in as decoration. Making these routes
+genuinely cacheable would mean extracting the account-link and cart-badge
+into small client components that fetch their own state after hydration
+— a cross-cutting change to the single most shared component in the
+storefront, with real risk of a logged-in-user flash-of-wrong-state, and
+not verifiable without a browser in this environment. Flagged as the
+concrete next step for a future performance pass rather than attempted
+half-verified here.
+
+Already satisfied without new work: pagination (`PAGE_SIZE`/`.range()` in
+`catalog.ts`, Phase 4), Next.js Image optimization (`next/image`
+everywhere images render, lazy-loading by default except explicit
+`priority` on above-the-fold hero/first-product images), and a
+server-component-first architecture (every interactive element on the
+product/catalog pages — wishlist button, add-to-cart, delivery check,
+recently-viewed — is already an isolated `"use client"` island reading
+its own state, not the page itself; confirmed while investigating the
+ISR question above).

@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient } from "@/lib/db/server";
+import { createPublicClient } from "@/lib/db/public";
 import { getAvailabilityMap } from "@/features/products/availability";
 import { getPrimaryImageMap } from "@/features/products/images";
 import type { ProductListItem } from "@/features/products/queries";
@@ -49,7 +49,7 @@ export type ProductDetail = {
 export async function getProductDetail(
   slug: string,
 ): Promise<ProductDetail | null> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
 
   const { data: product } = await supabase
     .from("products")
@@ -187,7 +187,7 @@ export async function getSimilarProducts(
   product: ProductDetail,
   limit = 8,
 ): Promise<ProductListItem[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
 
   let query = supabase
     .from("products")
@@ -261,7 +261,7 @@ export type ProductReview = {
 export async function getProductReviews(
   productId: string,
 ): Promise<ProductReview[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("reviews")
     .select("id, rating, title, body, is_verified_purchase, created_at")

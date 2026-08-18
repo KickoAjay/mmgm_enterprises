@@ -9,8 +9,12 @@ import { ProductCard } from "@/components/store/product-card";
 const BASE_PATH = "/sarees";
 
 export const metadata = {
-  title: "Sarees | MMGM Enterprises",
+  title: "Sarees",
   description: "Shop the full MMGM Enterprises saree collection.",
+  // Points every filter/sort/page combination at the base listing —
+  // those query params produce the same content in different orders,
+  // which search engines would otherwise index as near-duplicate pages.
+  alternates: { canonical: "/sarees" },
 };
 
 export default async function SareesPage({

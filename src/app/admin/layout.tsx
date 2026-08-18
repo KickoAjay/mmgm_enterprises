@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 // lives in (dashboard)/layout.tsx, not here, since /admin/login and
 // /admin/setup must stay reachable without already being an admin.
 export const metadata: Metadata = {
-  title: "MMGM Admin",
+  title: { default: "MMGM Admin", template: "%s | MMGM Admin" },
   robots: { index: false, follow: false },
 };
 

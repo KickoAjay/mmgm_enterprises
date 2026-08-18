@@ -6,7 +6,7 @@ import { formatOrderDate } from "@/features/orders/format";
 import { formatINR } from "@/features/products/format";
 
 export const metadata = {
-  title: "My Refunds | MMGM Enterprises",
+  title: "My Refunds",
 };
 
 export default async function RefundsPage() {

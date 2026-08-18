@@ -6,6 +6,7 @@ import { createServiceClient } from "@/lib/db/service";
 import { loginSchema } from "@/validations/auth";
 import { getCurrentUser, requireRole } from "@/lib/auth/session";
 import { logAdminAction } from "@/lib/auth/audit";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 
 export type AdminActionState = { error: string } | { success: true } | null;
 
@@ -27,6 +28,10 @@ export async function adminSignInAction(
     password: formData.get("password"),
   });
   if (!parsed.success) return { error: firstIssueMessage(parsed.error) };
+
+  const ip = await getClientIp();
+  const { allowed } = checkRateLimit(`admin-login:${ip}`, { limit: 10, windowMs: 15 * 60 * 1000 });
+  if (!allowed) return { error: "Too many attempts. Please try again in a few minutes." };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);

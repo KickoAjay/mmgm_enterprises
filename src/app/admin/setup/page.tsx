@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/db/service";
 import { BootstrapAdminForm } from "@/components/admin/bootstrap-admin-form";
 
 export const metadata = {
-  title: "Admin Setup | MMGM Enterprises",
+  title: "Admin Setup",
 };
 
 // Only reachable while no admin account exists yet — once the first one

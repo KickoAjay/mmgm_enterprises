@@ -4,7 +4,7 @@ import { getReturnEligibility } from "@/features/returns/eligibility";
 import { ReturnRequestForm } from "@/components/store/returns/return-request-form";
 
 export const metadata = {
-  title: "Request a Return | MMGM Enterprises",
+  title: "Request a Return",
 };
 
 export default async function RequestReturnPage({

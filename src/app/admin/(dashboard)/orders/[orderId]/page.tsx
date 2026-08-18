@@ -8,7 +8,7 @@ import { OrderStatusTimeline } from "@/components/store/orders/order-status-time
 import { OrderStatusForm } from "@/components/admin/order-status-form";
 
 export const metadata = {
-  title: "Order Details | MMGM Admin",
+  title: "Order Details",
 };
 
 export default async function AdminOrderDetailPage({

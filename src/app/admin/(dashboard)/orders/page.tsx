@@ -6,7 +6,7 @@ import { formatOrderDate } from "@/features/orders/format";
 import { formatINR } from "@/features/products/format";
 
 export const metadata = {
-  title: "Orders | MMGM Admin",
+  title: "Orders",
 };
 
 const STATUS_FILTERS: OrderStatus[] = [

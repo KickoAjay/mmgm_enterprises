@@ -9,8 +9,11 @@ import {
   resetPasswordSchema,
 } from "@/validations/auth";
 import { sendWelcomeEmail } from "@/lib/auth/notify";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 
 export type AuthActionState = { error: string } | { success: true } | null;
+
+const TOO_MANY_ATTEMPTS = "Too many attempts. Please try again in a few minutes.";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -30,6 +33,10 @@ export async function signUpAction(
     confirmPassword: formData.get("confirmPassword"),
   });
   if (!parsed.success) return { error: firstIssueMessage(parsed.error) };
+
+  const ip = await getClientIp();
+  const { allowed } = checkRateLimit(`signup:${ip}`, { limit: 5, windowMs: 60 * 60 * 1000 });
+  if (!allowed) return { error: TOO_MANY_ATTEMPTS };
 
   const { fullName, email, mobile, password } = parsed.data;
   const supabase = await createClient();
@@ -57,6 +64,10 @@ export async function signInAction(
     password: formData.get("password"),
   });
   if (!parsed.success) return { error: firstIssueMessage(parsed.error) };
+
+  const ip = await getClientIp();
+  const { allowed } = checkRateLimit(`login:${ip}`, { limit: 10, windowMs: 15 * 60 * 1000 });
+  if (!allowed) return { error: TOO_MANY_ATTEMPTS };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
@@ -93,6 +104,10 @@ export async function requestPasswordResetAction(
     email: formData.get("email"),
   });
   if (!parsed.success) return { error: firstIssueMessage(parsed.error) };
+
+  const ip = await getClientIp();
+  const { allowed } = checkRateLimit(`reset:${ip}`, { limit: 5, windowMs: 60 * 60 * 1000 });
+  if (!allowed) return { error: TOO_MANY_ATTEMPTS };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(
@@ -134,6 +149,10 @@ export async function resendVerificationEmailAction(
 ): Promise<AuthActionState> {
   const email = String(formData.get("email") ?? "");
   if (!email) return { error: "Missing email address" };
+
+  const ip = await getClientIp();
+  const { allowed } = checkRateLimit(`resend:${ip}`, { limit: 5, windowMs: 60 * 60 * 1000 });
+  if (!allowed) return { error: TOO_MANY_ATTEMPTS };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resend({

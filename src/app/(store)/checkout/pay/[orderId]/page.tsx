@@ -10,7 +10,7 @@ import { CashfreeCheckout } from "@/components/store/checkout/cashfree-checkout"
 import { formatINR } from "@/features/products/format";
 
 export const metadata = {
-  title: "Complete Payment | MMGM Enterprises",
+  title: "Complete Payment",
 };
 
 export default async function PaymentPage({

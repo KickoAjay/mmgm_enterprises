@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ToggleCustomerActiveButton } from "@/components/admin/toggle-customer-active-button";
 
 export const metadata = {
-  title: "Customers | MMGM Admin",
+  title: "Customers",
 };
 
 export default async function AdminCustomersPage({

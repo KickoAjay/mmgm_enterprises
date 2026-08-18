@@ -6,7 +6,7 @@ import { formatINR } from "@/features/products/format";
 import { Button } from "@/components/ui/button";
 
 export const metadata = {
-  title: "Order Confirmation | MMGM Enterprises",
+  title: "Order Confirmation",
 };
 
 export default async function OrderConfirmationPage({

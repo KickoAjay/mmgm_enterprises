@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { CheckoutForm } from "@/components/store/checkout/checkout-form";
 
 export const metadata = {
-  title: "Checkout | MMGM Enterprises",
+  title: "Checkout",
 };
 
 export default async function CheckoutPage() {

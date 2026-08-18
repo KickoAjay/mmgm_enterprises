@@ -5,7 +5,7 @@ import { WishlistLineItem } from "@/components/store/wishlist/wishlist-line-item
 import { Button } from "@/components/ui/button";
 
 export const metadata = {
-  title: "Wishlist | MMGM Enterprises",
+  title: "Wishlist",
 };
 
 export default async function WishlistPage() {

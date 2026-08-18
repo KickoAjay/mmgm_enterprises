@@ -5,7 +5,7 @@ import { ProductForm } from "@/components/admin/product-form";
 import { ProductMediaManager } from "@/components/admin/product-media-manager";
 
 export const metadata = {
-  title: "Edit Product | MMGM Admin",
+  title: "Edit Product",
 };
 
 export default async function EditProductPage({

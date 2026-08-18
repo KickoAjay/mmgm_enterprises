@@ -4,7 +4,7 @@ import { getCashfreeOrder } from "@/lib/cashfree/client";
 import { confirmPayment } from "@/features/payments/confirm";
 
 export const metadata = {
-  title: "Verifying Payment | MMGM Enterprises",
+  title: "Verifying Payment",
 };
 
 // Cashfree redirects the customer here after checkout. This does its own

@@ -6,7 +6,7 @@ import { formatINR } from "@/features/products/format";
 import { AdvanceRefundButton } from "@/components/admin/advance-refund-button";
 
 export const metadata = {
-  title: "Refunds | MMGM Admin",
+  title: "Refunds",
 };
 
 export default async function AdminRefundsPage() {
