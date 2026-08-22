@@ -107,6 +107,34 @@ export async function placeOrderAction(
     return { error: `${unavailable.name} is out of stock. Remove it to continue.` };
   }
 
+  // Beyond the boolean "in stock at all" check above: get_product_
+  // availability deliberately never exposes exact quantities to the
+  // browser (Phase 4), which means a cart quantity greater than what's
+  // actually left would otherwise sail through undetected until
+  // confirm_order_payment silently floored inventory at 0 (found in a
+  // full audit — see the fix_stock_oversell_detection migration for the
+  // matching confirmation-time fix). This check runs entirely
+  // server-side against the real inventory table via the service-role
+  // client — the quantity itself is never sent back to the browser,
+  // only a generic rejection, preserving that same privacy boundary.
+  const stockCheckClient = createServiceClient();
+  const { data: stockRows } = await stockCheckClient
+    .from("inventory")
+    .select("product_id, quantity")
+    .in(
+      "product_id",
+      items.map((item) => item.productId),
+    );
+  const stockMap = new Map((stockRows ?? []).map((row) => [row.product_id, row.quantity]));
+  const insufficientStock = items.find(
+    (item) => (stockMap.get(item.productId) ?? 0) < item.quantity,
+  );
+  if (insufficientStock) {
+    return {
+      error: `${insufficientStock.name} only has limited stock left. Please reduce the quantity in your bag.`,
+    };
+  }
+
   const productDiscount = items.reduce(
     (sum, item) => sum + (item.originalPrice - item.unitPrice) * item.quantity,
     0,

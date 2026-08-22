@@ -2,7 +2,17 @@ import "server-only";
 import { createServiceClient } from "@/lib/db/service";
 import { sendOrderConfirmedNotifications } from "@/features/payments/notify";
 
-export type ConfirmPaymentResult = "confirmed" | "already_confirmed" | "not_found";
+// "confirmed_oversold" — payment succeeded and the order is confirmed
+// exactly like "confirmed" (money was already captured by Cashfree by
+// this point, so the order can't be un-confirmed), but stock ran out
+// for at least one item. Flagged in order_status_history for admin
+// review (see the fix_stock_oversell_detection migration) rather than
+// silently clamping inventory to 0 with no record.
+export type ConfirmPaymentResult =
+  | "confirmed"
+  | "confirmed_oversold"
+  | "already_confirmed"
+  | "not_found";
 
 // Thin wrapper around the confirm_order_payment() SQL function (Phase 8
 // migration) — every write (payment status, order status + history,
@@ -26,7 +36,10 @@ export async function confirmPayment(
   // Only on the transition that actually just happened — the
   // "already_confirmed" branch means some earlier call (return page or
   // webhook) already sent this, so sending again here would double it.
-  if (result === "confirmed") {
+  // The customer still gets the normal confirmation email when oversold
+  // — that's an internal/admin concern, not something to expose to them
+  // via a different email.
+  if (result === "confirmed" || result === "confirmed_oversold") {
     const { data: payment } = await supabase
       .from("payments")
       .select("order_id")

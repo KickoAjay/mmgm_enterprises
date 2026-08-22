@@ -1672,3 +1672,115 @@ touched that process) and `curl`: `<header class="fixed inset-x-0 top-0
 z-40">`, both bars' `h-9`/`h-16` classes, `(store)/layout.tsx`'s `pt-25`
 wrapper, and `/sarees`' `sticky top-25` are all present in the shipped
 HTML exactly as intended.
+
+## 35. Full Audit Pass
+
+Requested as an exhaustive audit-fix-verify loop across the whole
+application. Ran the mechanical checks directly (typecheck/lint/test/
+build, all 32 required DB tables present, SEO metadata coverage,
+secrets/gitignore hygiene) and delegated four parallel read-only deep
+audits — Cashfree payment integration, auth/RBAC/IDOR, cart/stock/
+coupon/refund business logic, and general security hardening — each
+required to cite file:line for every claim rather than describe the
+architecture from memory. Two genuinely new, concrete findings came out
+of it; everything else the four audits checked (webhook signature
+verification, payment idempotency, RLS policies, role restrictions,
+checkout price/coupon server-side recalculation, secrets hygiene, rate
+limiting, CSP, file upload limits, SQL injection surface) came back
+PASS with evidence — see the individual fix commits/PR for the full
+list of what was checked, not just what was wrong.
+
+**Fixed — refund amount was a client round-trip, not a server ceiling.**
+`initiateRefundAction` (`src/features/returns/admin-actions.ts`) used to
+read `orderId`, `paymentId`, `userId`, and — critically —
+`eligibleAmount` straight from hidden form fields, then checked the
+submitted refund amount against that same client-supplied
+`eligibleAmount`. Spec §56.14's "refund can never exceed eligible
+amount" was therefore only ever checked against a number the client
+itself provided — a tampered hidden field (devtools, or a raw POST)
+could set an inflated ceiling and refund more than the return was
+actually worth, or attribute the refund to an unrelated order/payment/
+user. Fixed by deriving all four values server-side from `returnId`
+alone, mirroring the exact calculation `getAdminReturnDetail` already
+uses (`return_items` → `order_items.unit_price` × quantity) so the two
+can never disagree. `InitiateRefundForm` no longer submits the three
+now-unnecessary hidden fields; `eligibleAmount` stays as a display-only
+prop (max/default on the amount input).
+
+**Fixed — a confirmed-oversell was silently clamped to zero, no
+record.** Checkout only ever checks a boolean "in stock at all"
+(`get_product_availability`, Phase 4) — exact quantities are
+deliberately never exposed to the browser — so a cart quantity larger
+than what's actually left sailed through undetected. At payment
+confirmation, `confirm_order_payment`'s inventory decrement was `update
+inventory set quantity = greatest(0, quantity - x)` — floors at zero
+with no error, no flag, nothing to tell an admin two orders just got
+confirmed against the same last unit. Two-part fix:
+- `supabase/migrations/20260822000000_fix_stock_oversell_detection.sql`
+  replaces the function: still confirms the order and payment exactly
+  as before (money is already captured by Cashfree by this point — the
+  order can never be "rejected" here without keeping a customer's money
+  with no order to show for it), but now locks the inventory row
+  (`for update`) before comparing available quantity against what the
+  order needs, and if it's short, inserts a clearly-labeled `OVERSOLD —
+  ...` note into `order_status_history` for manual admin review. Returns
+  a new `confirmed_oversold` result string (added to `confirm.ts`'s
+  `ConfirmPaymentResult` type) alongside the existing `confirmed` —
+  treated identically for the customer-facing confirmation email, since
+  the oversell is an internal/admin concern, not something to expose to
+  the customer via a different email.
+- `src/features/checkout/actions.ts`'s `placeOrderAction` now also
+  checks the *actual* inventory quantity (via a service-role read,
+  never returned to the browser — preserves the existing "exact stock
+  counts are admin-only" boundary) against the cart's requested
+  quantity, rejecting with a generic "limited stock" message before an
+  order can even be placed. This closes the common case (a single
+  customer requesting more than what's left) — it does not fully
+  eliminate the genuinely-concurrent race (two requests reading stock
+  in the same instant, before either's order exists), which the
+  migration above is the backstop for. A true reservation system (decrement
+  at placement, release on abandonment/expiry) would close that
+  remaining gap entirely but is a materially larger change — no
+  expiry/cron for stale `PENDING_PAYMENT` orders exists yet either,
+  which such a system would also need — flagged here rather than
+  attempted half-finished.
+- **This migration has not been applied to the live Supabase project**
+  — same as every other migration in this repo, it needs to be run in
+  the Supabase SQL Editor (see README's Database Setup section). The
+  TypeScript changes are backward-compatible with the old function in
+  the meantime (it never returns `"confirmed_oversold"`, so that branch
+  is simply unreachable until the migration runs — no regression risk
+  either way).
+
+**Also fixed (minor, low severity):** `updatePasswordAction` was the one
+auth action with no rate limiting (`src/lib/auth/actions.ts`) — added,
+matching every other auth action's pattern. Not directly
+brute-forceable pre-fix (requires an active Supabase recovery session),
+just an inconsistency. Added `metadata` (page titles) to `/verify-email`
+and `/account`, the two SEO-audit-flagged pages that are Server
+Components; `login`/`register`/`forgot-password`/`reset-password`/
+`track-order` are Client Components (can't export `metadata` at all)
+and weren't worth wrapping in an extra file just for a browser tab
+title.
+
+**Confirmed clean, no code change needed:** all 32 spec-required DB
+tables exist; `.env.local` is not git-tracked and no secret is ever
+`NEXT_PUBLIC_`-prefixed; product pages have canonical URLs + JSON-LD
+structured data; no raw/concatenated SQL anywhere in the tracked source;
+Cashfree webhook signature verification uses the raw body + timing-safe
+comparison; payment confirmation is idempotent via both a unique
+`cashfree_event_id` constraint and a row-locked status recheck; wishlist
+duplicates are prevented by a DB unique constraint; order/return status
+transitions are re-validated server-side against the same
+`ALLOWED_TRANSITIONS` maps the UI uses, not trusted from the client.
+
+**Explicitly out of scope / needs production credentials, not
+guessed:** live Cashfree sandbox/production request-response shapes
+(the integration is written against Cashfree's docs, never exercised
+against a real sandbox call); real concurrent-load behavior of the
+oversell fix under actual simultaneous traffic (reasoned about, not
+load-tested — no live DB/traffic tool available here); Resend domain
+verification (already flagged in §24d/§33, unchanged); visual/responsive
+testing across real devices (no browser available in this environment —
+verified via rendered HTML/class presence and code review only, not a
+substitute for actually looking at it).

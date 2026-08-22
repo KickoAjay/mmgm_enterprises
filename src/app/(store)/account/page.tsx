@@ -7,6 +7,8 @@ import { formatOrderDate } from "@/features/orders/format";
 import { formatINR } from "@/features/products/format";
 import { Button } from "@/components/ui/button";
 
+export const metadata = { title: "My Account" };
+
 // Dashboard grows alongside each account-area feature as it ships —
 // orders (Phase 9), returns/refunds (Phase 10), and wishlist (Phase 6)
 // are real; addresses/reviews (spec §26) aren't built yet, so they're

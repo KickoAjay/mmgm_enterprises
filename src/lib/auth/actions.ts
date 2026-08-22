@@ -130,6 +130,18 @@ export async function updatePasswordAction(
   });
   if (!parsed.success) return { error: firstIssueMessage(parsed.error) };
 
+  // Low-severity gap found in a full audit: every other auth action here
+  // is rate-limited, this one wasn't. Not directly brute-forceable by an
+  // anonymous attacker (it requires an active Supabase recovery session
+  // from the emailed link), but there's no reason to leave it the one
+  // exception.
+  const ip = await getClientIp();
+  const { allowed } = checkRateLimit(`update-password:${ip}`, {
+    limit: 10,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!allowed) return { error: TOO_MANY_ATTEMPTS };
+
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({
     password: parsed.data.password,

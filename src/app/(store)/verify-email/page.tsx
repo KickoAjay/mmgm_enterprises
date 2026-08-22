@@ -2,6 +2,8 @@ import Link from "next/link";
 import { AuthCard } from "@/components/store/auth-card";
 import { ResendVerificationForm } from "./resend-verification-form";
 
+export const metadata = { title: "Verify Your Email" };
+
 export default async function VerifyEmailPage({
   searchParams,
 }: {

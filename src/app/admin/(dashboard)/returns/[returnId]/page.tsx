@@ -101,13 +101,7 @@ export default async function AdminReturnDetailPage({
                 </div>
               ) : (
                 <div className="mt-4">
-                  <InitiateRefundForm
-                    returnId={ret.id}
-                    orderId={ret.orderId}
-                    paymentId={ret.paymentId}
-                    userId={ret.userId}
-                    eligibleAmount={ret.eligibleRefundAmount}
-                  />
+                  <InitiateRefundForm returnId={ret.id} eligibleAmount={ret.eligibleRefundAmount} />
                 </div>
               )}
             </div>

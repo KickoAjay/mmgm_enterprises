@@ -9,15 +9,9 @@ import { Label } from "@/components/ui/label";
 
 export function InitiateRefundForm({
   returnId,
-  orderId,
-  paymentId,
-  userId,
   eligibleAmount,
 }: {
   returnId: string;
-  orderId: string;
-  paymentId: string;
-  userId: string;
   eligibleAmount: number;
 }) {
   const [state, formAction, isPending] = useActionState<ReturnActionState, FormData>(
@@ -27,11 +21,12 @@ export function InitiateRefundForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
+      {/* orderId/paymentId/userId/eligibleAmount are no longer submitted —
+          the server derives all of them from returnId alone (see
+          initiateRefundAction), so there's nothing left here for a
+          tampered hidden field to lie about. eligibleAmount below is
+          display-only (max/defaultValue on the amount input). */}
       <input type="hidden" name="returnId" value={returnId} />
-      <input type="hidden" name="orderId" value={orderId} />
-      <input type="hidden" name="paymentId" value={paymentId} />
-      <input type="hidden" name="userId" value={userId} />
-      <input type="hidden" name="eligibleAmount" value={eligibleAmount} />
 
       <div className="flex flex-col gap-1.5 max-w-[200px]">
         <Label htmlFor="amount">Refund Amount (₹)</Label>

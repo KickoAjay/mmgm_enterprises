@@ -63,26 +63,51 @@ export async function initiateRefundAction(
 ): Promise<ReturnActionState> {
   const membership = await requireRole(["SUPER_ADMIN", "ADMIN", "ORDER_MANAGER"]);
   const returnId = String(formData.get("returnId") ?? "");
-  const orderId = String(formData.get("orderId") ?? "");
-  const paymentId = String(formData.get("paymentId") ?? "");
-  const userId = String(formData.get("userId") ?? "");
-  const eligibleAmount = Number(formData.get("eligibleAmount") ?? "0");
   const amountRaw = Number(formData.get("amount") ?? "0");
 
-  if (!returnId || !orderId || !paymentId || !userId) {
-    return { error: "Missing required fields" };
-  }
+  if (!returnId) return { error: "Missing required fields" };
   if (!Number.isFinite(amountRaw) || amountRaw <= 0) {
     return { error: "Enter a valid refund amount" };
   }
-  // Business rule §56.14 — never allow refund amount greater than
-  // eligible amount, enforced server-side regardless of what the form
-  // last displayed.
+
+  const supabase = await createClient();
+
+  // Everything below is derived server-side from returnId alone — an
+  // earlier version trusted orderId/paymentId/userId/eligibleAmount as
+  // plain hidden form fields (all client-tamperable via devtools/a raw
+  // POST), which meant the "never exceed eligible amount" cap (spec
+  // §56.14) was only ever checked against a number the client itself
+  // supplied. Found in a full audit; this mirrors the exact eligible-
+  // amount calculation in getAdminReturnDetail (admin-queries.ts) so the
+  // two can never disagree.
+  const { data: returnRow } = await supabase
+    .from("returns")
+    .select("id, order_id, user_id")
+    .eq("id", returnId)
+    .maybeSingle();
+  if (!returnRow) return { error: "Return not found" };
+
+  const [{ data: payment }, { data: returnItems }] = await Promise.all([
+    supabase.from("payments").select("id").eq("order_id", returnRow.order_id).maybeSingle(),
+    supabase.from("return_items").select("order_item_id, quantity").eq("return_id", returnId),
+  ]);
+  if (!payment) return { error: "No payment found for this order" };
+
+  const orderItemIds = (returnItems ?? []).map((ri) => ri.order_item_id);
+  const { data: orderItemRows } =
+    orderItemIds.length > 0
+      ? await supabase.from("order_items").select("id, unit_price").in("id", orderItemIds)
+      : { data: [] };
+  const unitPriceMap = new Map((orderItemRows ?? []).map((oi) => [oi.id, oi.unit_price]));
+  const eligibleAmount = (returnItems ?? []).reduce(
+    (sum, ri) => sum + (unitPriceMap.get(ri.order_item_id) ?? 0) * ri.quantity,
+    0,
+  );
+
   if (amountRaw > eligibleAmount) {
     return { error: `Refund amount cannot exceed the eligible amount of ₹${eligibleAmount}` };
   }
 
-  const supabase = await createClient();
   const { data: existing } = await supabase
     .from("refunds")
     .select("id")
@@ -92,9 +117,9 @@ export async function initiateRefundAction(
 
   const { error } = await supabase.from("refunds").insert({
     return_id: returnId,
-    order_id: orderId,
-    payment_id: paymentId,
-    user_id: userId,
+    order_id: returnRow.order_id,
+    payment_id: payment.id,
+    user_id: returnRow.user_id,
     amount: amountRaw,
     status: "REQUESTED",
   });
@@ -105,7 +130,7 @@ export async function initiateRefundAction(
     action: "REFUND_INITIATED",
     entityType: "refunds",
     entityId: returnId,
-    metadata: { orderId, amount: amountRaw },
+    metadata: { orderId: returnRow.order_id, amount: amountRaw },
   });
 
   return { success: true };
