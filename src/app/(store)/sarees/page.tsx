@@ -55,7 +55,7 @@ export default async function SareesPage({
       </div>
 
       {/* Mobile sticky filter/sort bar */}
-      <div className="sticky top-16 z-30 -mx-6 mb-6 flex items-center justify-between border-y border-border bg-background px-6 py-3 lg:hidden">
+      <div className="sticky top-25 z-30 -mx-6 mb-6 flex items-center justify-between border-y border-border bg-background px-6 py-3 lg:hidden">
         <MobileFilterDrawer>
           <FilterSidebar
             basePath={BASE_PATH}

@@ -20,7 +20,7 @@ export function AnnouncementBar() {
   }, []);
 
   return (
-    <div className="text-meta bg-primary py-2 text-center font-medium tracking-wide text-primary-foreground">
+    <div className="text-meta flex h-9 items-center justify-center bg-primary text-center font-medium tracking-wide text-primary-foreground">
       {MESSAGES[index]}
     </div>
   );

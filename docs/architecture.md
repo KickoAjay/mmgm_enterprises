@@ -1637,3 +1637,38 @@ code change needed beyond that — every template already reads
 `EMAIL_FROM` at send time). Until then, a real visitor's contact-form
 submission returns "Something went wrong sending your message" — a
 truthful failure, not a silent one, but not a working inbox either.
+
+## 34. Nav Bar: `sticky` → `fixed` (explicit request)
+
+§29/§33 explained why the header stayed `sticky` rather than `fixed` —
+`sticky` already pins at top-of-viewport once scrolled past, without
+needing a manual content offset. The user asked for `fixed` explicitly
+and directly a second time, so this switches it for real rather than
+re-litigating the tradeoff a third time.
+
+`position: fixed` removes the header from document flow entirely, so
+unlike `sticky` it does need a matching content offset or the page's own
+content renders underneath it. To make that offset exact rather than an
+estimate, both bars inside the header were changed from padding-driven
+auto-height to explicit fixed heights: `AnnouncementBar` is `h-9` (2.25rem/
+36px, flex-centered instead of `py-2`), the nav row is `h-16` (4rem/64px,
+`py-4` replaced with `h-16 h-full` on the inner flex row). Total header
+height is therefore an exact, known 6.25rem (100px) — not a guess — and
+`(store)/layout.tsx` wraps `{children}` (not `Footer`, which should still
+sit directly after content) in `pt-25` to match it exactly.
+
+The one other spot that assumed the header's old height: `/sarees`'
+mobile filter/sort bar was `sticky top-16` (64px — the nav row's height
+alone, correct back when the announcement bar wasn't part of what it
+needed to clear). With the header now fixed at a full 100px, that bar
+would sit 36px too high (underneath the announcement bar) at `top-16`;
+moved to `top-25` to sit flush beneath the fixed header instead. Grepped
+for every other `sticky top-` in the codebase to confirm this was the
+only other one depending on the old header height.
+
+Verified via a local production build (`pnpm build && pnpm start` on
+port 3001, since the user's own `pnpm dev` was occupying 3000 — never
+touched that process) and `curl`: `<header class="fixed inset-x-0 top-0
+z-40">`, both bars' `h-9`/`h-16` classes, `(store)/layout.tsx`'s `pt-25`
+wrapper, and `/sarees`' `sticky top-25` are all present in the shipped
+HTML exactly as intended.

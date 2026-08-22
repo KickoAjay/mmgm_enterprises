@@ -14,10 +14,10 @@ export async function Header() {
   const isLoggedIn = Boolean(user);
 
   return (
-    <header>
+    <header className="fixed inset-x-0 top-0 z-40">
       <AnnouncementBar />
-      <div className="sticky top-0 z-40 border-b border-border bg-background">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+      <div className="h-16 border-b border-border bg-background">
+        <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
             <MobileNav isLoggedIn={isLoggedIn} />
             <Link
