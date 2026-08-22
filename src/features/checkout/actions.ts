@@ -48,24 +48,35 @@ export async function placeOrderAction(
   _prevState: CheckoutActionState,
   formData: FormData,
 ): Promise<CheckoutActionState> {
+  // FormData.get() returns null for a field that isn't in the form at
+  // all — which happens by design here: guestEmail is only rendered for
+  // guests, and the whole billing-address block only renders when
+  // "Same as shipping" (default-checked) is unticked. checkoutSchema's
+  // optional fields accept `undefined`, not `null` — passing null failed
+  // Zod's base type check before any custom message ever ran, surfacing
+  // as a generic "Invalid input" and blocking checkout by default for
+  // every customer who left "Same as shipping" checked. `?? undefined`
+  // normalizes "field wasn't submitted" to the value these fields
+  // actually expect.
+  const field = (name: string) => formData.get(name) ?? undefined;
   const parsed = checkoutSchema.safeParse({
-    guestEmail: formData.get("guestEmail"),
-    shippingFullName: formData.get("shippingFullName"),
-    shippingPhone: formData.get("shippingPhone"),
-    shippingLine1: formData.get("shippingLine1"),
-    shippingLine2: formData.get("shippingLine2"),
-    shippingCity: formData.get("shippingCity"),
-    shippingState: formData.get("shippingState"),
-    shippingPincode: formData.get("shippingPincode"),
-    billingSameAsShipping: formData.get("billingSameAsShipping"),
-    billingFullName: formData.get("billingFullName"),
-    billingPhone: formData.get("billingPhone"),
-    billingLine1: formData.get("billingLine1"),
-    billingLine2: formData.get("billingLine2"),
-    billingCity: formData.get("billingCity"),
-    billingState: formData.get("billingState"),
-    billingPincode: formData.get("billingPincode"),
-    couponCode: formData.get("couponCode"),
+    guestEmail: field("guestEmail"),
+    shippingFullName: field("shippingFullName"),
+    shippingPhone: field("shippingPhone"),
+    shippingLine1: field("shippingLine1"),
+    shippingLine2: field("shippingLine2"),
+    shippingCity: field("shippingCity"),
+    shippingState: field("shippingState"),
+    shippingPincode: field("shippingPincode"),
+    billingSameAsShipping: field("billingSameAsShipping"),
+    billingFullName: field("billingFullName"),
+    billingPhone: field("billingPhone"),
+    billingLine1: field("billingLine1"),
+    billingLine2: field("billingLine2"),
+    billingCity: field("billingCity"),
+    billingState: field("billingState"),
+    billingPincode: field("billingPincode"),
+    couponCode: field("couponCode"),
   });
   if (!parsed.success) return { error: firstIssueMessage(parsed.error) };
   const input = parsed.data;

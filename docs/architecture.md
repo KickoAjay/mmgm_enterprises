@@ -1784,3 +1784,43 @@ verification (already flagged in §24d/§33, unchanged); visual/responsive
 testing across real devices (no browser available in this environment —
 verified via rendered HTML/class presence and code review only, not a
 substitute for actually looking at it).
+
+## 36. Checkout Blocked by Default — FormData null vs. Zod's `.optional()`
+
+A real user report: placing an order failed with a generic "Invalid
+input" every time, even with a fully valid cart and address. Root
+cause — `FormData.get(name)` returns `null` for a field that isn't in
+the form's DOM at all, which happens by design in two places in
+`checkout-form.tsx`: `guestEmail` only renders for guests (a logged-in
+customer's form never has that input), and the entire billing-address
+block only renders when "Same as shipping" is unticked — and it's
+**checked by default** (`useState(true)`). So for the single most
+common case — a logged-in customer leaving "Same as shipping" alone —
+every optional field in `checkoutSchema` (`guestEmail`,
+`billingFullName`, `billingPhone`, `billingLine1/2`, `billingCity`,
+`billingState`, `billingPincode`) arrived as `null`. Zod's `.optional()`
+widens a schema to accept `T | undefined` — not `null` — so the base
+type check failed before any of the schema's own custom messages
+(`"Enter full name"` etc.) ever ran, falling through to
+`firstIssueMessage`'s generic `"Invalid input"` fallback. This blocked
+checkout by default for essentially every customer, not an edge case.
+
+Fixed in `placeOrderAction` (`src/features/checkout/actions.ts`) with a
+small `field = (name) => formData.get(name) ?? undefined` helper used
+for every field read into `checkoutSchema.safeParse(...)` — normalizes
+"wasn't submitted" to the value `.optional()` actually expects. Found
+and fixed the identical pattern in the admin product form
+(`parseProductForm` in `src/features/products/admin-actions.ts`) at the
+same time — an unchecked `<input type="checkbox">` (`blousePieceIncluded`,
+`returnEligible`) submits nothing at all, hitting the exact same
+null-vs-undefined gap. Confirmed both schemas' only other `.optional()`
+users (`auth.ts`'s mobile field, `contact.ts`'s phone field) don't have
+this exposure — their inputs are always present in the DOM, never
+conditionally unmounted, so they only ever submit `""`, never `null`.
+
+Verified two ways: `src/validations/checkout.test.ts` (new, permanent)
+asserts `checkoutSchema` rejects the raw `null` shape FormData actually
+produces and accepts it once normalized to `undefined` — both
+assertions pass, directly proving the bug and the fix against the real
+schema rather than a description of it. Then the full suite
+(typecheck/lint/40 tests/build) reran clean.
