@@ -45,7 +45,13 @@ export default async function PaymentPage({
     existing = order.cashfreeOrderId
       ? await getCashfreeOrder(order.cashfreeOrderId)
       : null;
-  } catch {
+  } catch (err) {
+    // Never shown to the customer (spec §49) — but swallowing this
+    // silently is exactly what made two real misconfigurations (a
+    // sandbox/production credential mismatch, then an http
+    // NEXT_PUBLIC_SITE_URL rejected by Cashfree's return_url validation)
+    // undiagnosable from Vercel's logs alone. Logged, not exposed.
+    console.error(`Cashfree order lookup failed for order ${order.id}:`, err);
     fetchFailed = true;
   }
 
@@ -73,7 +79,8 @@ export default async function PaymentPage({
           returnUrl: `${siteUrl}/checkout/pay/${order.id}/return`,
         });
         paymentSessionId = created.paymentSessionId;
-      } catch {
+      } catch (err) {
+        console.error(`Cashfree order creation failed for order ${order.id}:`, err);
         fetchFailed = true;
       }
     }
