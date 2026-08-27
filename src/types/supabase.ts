@@ -707,6 +707,27 @@ export type Database = {
         >;
         Relationships: [];
       };
+      enquiries: {
+        Row: {
+          id: string;
+          full_name: string;
+          email: string;
+          phone: string | null;
+          message: string;
+          is_read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          full_name: string;
+          email: string;
+          phone?: string | null;
+          message: string;
+          is_read?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["enquiries"]["Insert"]>;
+        Relationships: [];
+      };
       audit_logs: {
         Row: {
           id: string;

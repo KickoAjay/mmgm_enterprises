@@ -1824,3 +1824,79 @@ produces and accepts it once normalized to `undefined` — both
 assertions pass, directly proving the bug and the fix against the real
 schema rather than a description of it. Then the full suite
 (typecheck/lint/40 tests/build) reran clean.
+
+## 37. Admin Login Was Two Unconnected Systems
+
+A real user report: logging in with the admin account (`admin@mmgm.com`)
+opened the customer dashboard, not the admin panel. Not a broken role
+system — `admin_users`/`roles` were correct the whole time, and
+`/admin/login`'s `adminSignInAction` (`src/lib/auth/admin-actions.ts`)
+already checked them correctly and redirected to `/admin`. The gap was
+that `/login`'s `signInAction` (`src/lib/auth/actions.ts`) — the
+regular customer login form — never checked `admin_users` at all,
+unconditionally `redirect("/account")` regardless of who signed in. An
+admin who used the customer login form (the obvious thing to try,
+since nothing on the site points at `/admin/login` specifically) always
+landed on the customer dashboard.
+
+Fixed by adding the same `admin_users` membership query
+`adminSignInAction` already runs to `signInAction`, redirecting to
+`/admin` (and bumping `last_login_at`) when it matches, falling through
+to the unchanged `/account` redirect otherwise — a no-op for normal
+customers, who simply have no `admin_users` row. `/admin/login`,
+`requireAdmin`/`requireRole` route protection, and the rest of the
+admin panel are untouched. Verified against the live Supabase project:
+signed in as `admin@mmgm.com` via the anon key and ran the exact query
+`signInAction` now runs — confirmed it finds the membership row that
+would trigger the `/admin` redirect.
+
+## 38. Categories Admin + Enquiries Inbox
+
+Two gaps flagged (not found as bugs) during the admin-login
+investigation: no admin UI for managing categories (they were seed/SQL
+-managed only, despite full CRUD RLS already existing on the table
+since Phase 2 — `"Admins manage/update/delete categories"`), and no
+record of a Contact-page submission beyond the outbound email.
+
+**Categories** (`/admin/categories`, `/admin/categories/new`,
+`/admin/categories/[categoryId]`) — mirrors the existing product admin
+pattern exactly (`src/features/categories/{admin-queries,admin-actions}.ts`,
+`CategoryForm` shared between create/edit, same `field(name) =>
+formData.get(name) ?? undefined` normalization as §36's fix). Delete is
+a real DELETE (not a soft-delete like products) since a category has no
+order-history-style reason to be preserved — but `products.category_id`
+is `on delete restrict`, so deleting a category still in use fails at
+the DB level; caught (Postgres code `23503`) and turned into "deactivate
+instead" rather than a raw constraint error. No migration needed —
+RLS already covered this.
+
+**Enquiries** (`/admin/enquiries`, `/admin/enquiries/[enquiryId]`, new
+`enquiries` table — `supabase/migrations/20260824000000_add_enquiries.sql`,
+**not yet applied to the live project**, same manual step as every
+other migration here). Until now a Contact-page submission existed only
+as an outbound email (`src/features/contact/actions.ts`) — nothing was
+ever stored. That's a gap on its own, and a materially worse one right
+now specifically: Resend's sandbox sender still can't deliver to
+`COMPANY_EMAIL` (confirmed by testing the live API directly, §33/§24d —
+domain not verified), so every contact-form submission today is
+silently lost the moment the email send fails. `sendContactMessageAction`
+now saves the enquiry via the service-role client (anonymous submitter,
+same pattern as guest checkout) *before* attempting the email, and
+treats the DB save — not the email — as what "did this go through"
+means for the customer-facing response; an email failure is logged
+(`logEmailDelivery`) but no longer shown as an error or invites a
+duplicate-causing retry. Read/delete are admin-only via RLS
+(`public.is_admin()`); there's deliberately no insert policy at all,
+since the only writer is the server action's service-role client.
+Gated to `["SUPER_ADMIN", "ADMIN", "CUSTOMER_SUPPORT"]` — customer
+support's domain, same tier as returns/refunds. Opening the detail page
+marks it read (ordinary inbox behavior); a `Mark Unread` control is
+still available since the read state is the only "have I dealt with
+this" signal this feature has.
+
+Both features typecheck/lint/build clean; Categories was additionally
+verified live (signed in as the real admin account, confirmed the
+`categories` table read/write path already works over RLS today);
+Enquiries could only be verified up to confirming the migration hasn't
+run yet (`PGRST205 — Could not find the table 'public.enquiries'`) —
+expected, not a bug, until that migration is applied.

@@ -7,10 +7,12 @@ const NAV_LINKS = [
   { label: "Dashboard", href: "/admin" },
   { label: "Reports", href: "/admin/reports" },
   { label: "Products", href: "/admin/products" },
+  { label: "Categories", href: "/admin/categories" },
   { label: "Orders", href: "/admin/orders" },
   { label: "Returns", href: "/admin/returns" },
   { label: "Refunds", href: "/admin/refunds" },
   { label: "Customers", href: "/admin/customers" },
+  { label: "Enquiries", href: "/admin/enquiries" },
 ];
 
 export default async function AdminDashboardLayout({

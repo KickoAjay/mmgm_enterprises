@@ -55,6 +55,8 @@ Migrations live in `supabase/migrations/`, applied in filename order via the Sup
 6. `20260810170000_phase10_returns_storage.sql`
 7. `20260810180000_phase11_admin.sql`
 8. `20260810190000_phase14_security.sql`
+9. `20260822000000_fix_stock_oversell_detection.sql`
+10. `20260824000000_add_enquiries.sql` — Enquiries admin inbox (Contact form submissions)
 
 Then seed demo data with `supabase/seed.sql` (optional, but the storefront has nothing to show without it).
 
