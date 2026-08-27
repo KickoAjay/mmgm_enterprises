@@ -87,6 +87,29 @@ export async function signInAction(
     return { error: "This account has been disabled. Contact support for help." };
   }
 
+  // Same admin_users membership check adminSignInAction uses — signing in
+  // here with an admin account used to land on the customer dashboard
+  // regardless, since this action never checked. Doesn't affect normal
+  // customers: they simply have no admin_users row, so this is always
+  // null for them and behavior is unchanged. /admin/login keeps working
+  // exactly as before; this just makes the same real, DB-backed role
+  // check reachable from the regular login form too.
+  const { data: adminMembership } = user
+    ? await supabase
+        .from("admin_users")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .maybeSingle()
+    : { data: null };
+  if (adminMembership) {
+    await supabase
+      .from("admin_users")
+      .update({ last_login_at: new Date().toISOString() })
+      .eq("id", adminMembership.id);
+    redirect("/admin");
+  }
+
   redirect("/account");
 }
 
