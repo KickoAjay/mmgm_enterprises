@@ -1,4 +1,5 @@
 import "server-only";
+import { getSiteUrl } from "@/lib/site-url";
 
 export const CASHFREE_SANDBOX_API_URL = "https://sandbox.cashfree.com/pg";
 export const CASHFREE_PRODUCTION_API_URL = "https://api.cashfree.com/pg";
@@ -63,14 +64,8 @@ export function isCashfreeConfigured(): boolean {
   );
 }
 
-export function normalizeSiteUrl(url?: string): string {
-  const fallback = "http://localhost:3000";
-  const trimmed = (url ?? fallback).trim().replace(/\/+$/, "");
-  return trimmed || fallback;
-}
-
 export function getConfiguredSiteUrl(): string {
-  return normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
+  return getSiteUrl();
 }
 
 // Production Cashfree only allows checkout from whitelisted https domains.

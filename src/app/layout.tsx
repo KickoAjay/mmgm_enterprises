@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope, Fraunces } from "next/font/google";
+import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -15,7 +16,7 @@ const fraunces = Fraunces({
   display: "swap",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const siteUrl = getSiteUrl();
 const siteName = "MMGM Enterprises";
 const defaultDescription =
   "Discover timeless sarees curated for every occasion at MMGM Enterprises.";

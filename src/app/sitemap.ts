@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 import { createServiceClient } from "@/lib/db/service";
+import { getSiteUrl } from "@/lib/site-url";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const siteUrl = getSiteUrl();
 
 // Static, canonical, publicly-indexable routes only. Category browsing
 // lives at /shop?category=slug (a filtered view of /sarees, not a
