@@ -1,5 +1,4 @@
 import { Header } from "@/components/store/header";
-import { Footer } from "@/components/store/footer";
 
 export default function StoreLayout({ children }: LayoutProps<"/">) {
   return (
@@ -9,8 +8,7 @@ export default function StoreLayout({ children }: LayoutProps<"/">) {
           offset (h-9 announcement bar + h-16 nav row = 6.25rem) is the
           only thing standing between it and covering the top of every
           page's content. */}
-      <div className="pt-25">{children}</div>
-      <Footer />
+      <div className="flex flex-1 flex-col pt-25">{children}</div>
     </>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope, Fraunces } from "next/font/google";
+import { Footer } from "@/components/store/footer";
 import { getSiteUrl } from "@/lib/site-url";
 import "./globals.css";
 
@@ -49,7 +50,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${manrope.variable} ${fraunces.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-full flex-col antialiased">
+        <div className="flex flex-1 flex-col">{children}</div>
+        <Footer />
+      </body>
     </html>
   );
 }

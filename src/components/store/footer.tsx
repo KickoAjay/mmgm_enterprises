@@ -136,11 +136,16 @@ export function Footer() {
       </div>
 
       <div className="border-t border-border">
-        <div className="text-meta mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-6 py-6 text-muted-foreground sm:flex-row">
-          <span>
-            © {new Date().getFullYear()} MMGM Enterprises. All rights reserved.
-          </span>
-          <div className="flex items-center gap-3">
+        <div className="text-meta mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-6 text-muted-foreground sm:flex-row sm:items-center">
+          <div className="flex flex-col items-center gap-1 text-center sm:items-start sm:text-left">
+            <span>
+              © {new Date().getFullYear()} MMGM Enterprises. All rights reserved.
+            </span>
+            <span className="text-muted-foreground/80">
+              Developed by Kicko Tech
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3">
             {PAYMENT_METHODS.map((method) => (
               <span
                 key={method}
