@@ -1971,3 +1971,40 @@ sandbox credentials do not exist in this environment. Nothing here can
 make Cashfree's API accept them, generate them, or safely emulate them
 — they can only come from logging into the Cashfree dashboard's
 Sandbox/Test mode and copying an App ID + Secret Key from there.
+
+## 40. Cashfree Order Lookup 401 Silently Blocked New Session Creation
+
+A real customer-facing report ("We couldn't start the payment session")
+was traced to an actual code bug, found by testing the live production
+credentials directly rather than assuming they were the cause again:
+
+- A fresh `createCashfreeOrder` call against production, run directly
+  with `.env.local`'s exact credentials, returned `200` with a real
+  `payment_session_id` — proving the credentials themselves are fine.
+- The failing order's `payments.cashfree_order_id` was `order_number`
+  (`src/features/checkout/actions.ts` sets this eagerly at order-creation
+  time, before any real Cashfree order exists — by design, so a payment
+  row always has a stable identifier). Looking that value up via
+  `GET /orders/{id}` against Cashfree returned `401 authentication
+  Failed` — confirmed by direct API test that a *nonexistent* order_id
+  instead returns `404 order_not_found`, so `401` here means this
+  specific order_id was recorded before a real Cashfree order existed
+  under the currently-configured credentials (this project switched
+  between sandbox and production credentials multiple times during
+  testing).
+- The actual bug: `checkout/pay/[orderId]/page.tsx` treated this
+  optional, best-effort "resume an existing session" lookup as
+  load-bearing. Any error from it other than the already-handled 404
+  (including this 401) set `fetchFailed = true` and returned the error
+  page immediately — skipping the fallback `createCashfreeOrder` call
+  entirely, even though that call demonstrably succeeds.
+
+**Fix** (`src/app/(store)/checkout/pay/[orderId]/page.tsx`): the lookup's
+`catch` no longer sets `fetchFailed`; it only logs and lets `existing`
+stay `null`, so the flow always falls through to creating a fresh
+Cashfree order when no resumable session was found. `fetchFailed` is now
+set only by an actual failure of the *creation* call — the one that
+genuinely means no session can be started.
+
+Verified: `pnpm typecheck`, `pnpm lint`, `pnpm test` (40/40), `pnpm
+build` all pass clean after the change.

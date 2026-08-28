@@ -40,19 +40,22 @@ export default async function PaymentPage({
   }
 
   let existing: CashfreeOrder | null = null;
-  let fetchFailed = false;
   try {
     existing = order.cashfreeOrderId
       ? await getCashfreeOrder(order.cashfreeOrderId)
       : null;
   } catch (err) {
-    // Never shown to the customer (spec §49) — but swallowing this
-    // silently is exactly what made two real misconfigurations (a
-    // sandbox/production credential mismatch, then an http
-    // NEXT_PUBLIC_SITE_URL rejected by Cashfree's return_url validation)
-    // undiagnosable from Vercel's logs alone. Logged, not exposed.
-    console.error(`Cashfree order lookup failed for order ${order.id}:`, err);
-    fetchFailed = true;
+    // Best-effort resume check only — used solely to reuse an in-progress
+    // session instead of creating a duplicate one. A failure here (a stale
+    // cashfree_order_id recorded before any real Cashfree order existed
+    // under the current credentials, a transient network error, etc.)
+    // must NOT block the customer: fall through and create a fresh order
+    // below instead. Previously this set fetchFailed and aborted the whole
+    // page even though order creation itself works fine — verified live.
+    console.error(
+      `Cashfree order lookup failed for order ${order.id}, creating a fresh session instead:`,
+      err,
+    );
   }
 
   if (existing?.orderStatus === "PAID") {
@@ -65,24 +68,23 @@ export default async function PaymentPage({
     : "production";
 
   let paymentSessionId: string | null = null;
-  if (!fetchFailed) {
-    if (existing?.paymentSessionId && existing.orderStatus === "ACTIVE") {
-      paymentSessionId = existing.paymentSessionId;
-    } else {
-      try {
-        const created = await createCashfreeOrder({
-          orderId: order.cashfreeOrderId ?? order.orderNumber,
-          amount: order.grandTotal,
-          customerId: order.id,
-          customerEmail: order.customerEmail,
-          customerPhone: order.customerPhone,
-          returnUrl: `${siteUrl}/checkout/pay/${order.id}/return`,
-        });
-        paymentSessionId = created.paymentSessionId;
-      } catch (err) {
-        console.error(`Cashfree order creation failed for order ${order.id}:`, err);
-        fetchFailed = true;
-      }
+  let fetchFailed = false;
+  if (existing?.paymentSessionId && existing.orderStatus === "ACTIVE") {
+    paymentSessionId = existing.paymentSessionId;
+  } else {
+    try {
+      const created = await createCashfreeOrder({
+        orderId: order.cashfreeOrderId ?? order.orderNumber,
+        amount: order.grandTotal,
+        customerId: order.id,
+        customerEmail: order.customerEmail,
+        customerPhone: order.customerPhone,
+        returnUrl: `${siteUrl}/checkout/pay/${order.id}/return`,
+      });
+      paymentSessionId = created.paymentSessionId;
+    } catch (err) {
+      console.error(`Cashfree order creation failed for order ${order.id}:`, err);
+      fetchFailed = true;
     }
   }
 
