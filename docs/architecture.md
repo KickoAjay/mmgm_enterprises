@@ -1900,3 +1900,74 @@ verified live (signed in as the real admin account, confirmed the
 Enquiries could only be verified up to confirming the migration hasn't
 run yet (`PGRST205 — Could not find the table 'public.enquiries'`) —
 expected, not a bug, until that migration is applied.
+
+## 39. Cashfree "Couldn't Start Payment Session" — Full Re-Verification
+
+A full payment-integration audit was requested after §34's `return_url`
+finding kept recurring. Re-traced the entire flow end to end against
+the actual code (not from memory) and confirmed everything except the
+environment values themselves:
+
+- **Frontend/backend mode consistency is structurally guaranteed, not
+  just conventionally followed** — `CashfreeCheckout` (`src/components/
+  store/checkout/cashfree-checkout.tsx`) takes `mode: "sandbox" |
+  "production"` as a prop computed exactly once, in `PaymentPage`, from
+  `CASHFREE_API_URL.includes("sandbox")`. There is no second place mode
+  gets decided, so a frontend/backend mismatch (the request's checklist
+  items #1/#2) isn't a class of bug this codebase can even produce.
+- **Amount is fully server-derived, verified against this exact case**:
+  subtotal ₹2,878 (already net of per-item discounts — `selling_price ×
+  qty` from `getCartSummary`, "Product Discount ₹720" is
+  original-vs-selling-price display only, not subtracted twice) → no
+  coupon → shipping free (≥₹999 threshold) → GST `round(2878 × 0.05) =
+  144` → grand total `2878 + 0 + 144 = 3022`. Matches the screenshot
+  digit-for-digit. This `orders.grand_total` value (never a client
+  input) is what `createCashfreeOrder` sends as `order_amount` — traced
+  the full chain, not assumed.
+- **Webhook re-confirmed correct and idempotent**: raw body read before
+  JSON parsing (required for signature verification to match what
+  Cashfree actually signed), HMAC-SHA256 + `timingSafeEqual`, a
+  `payment_transactions.cashfree_event_id` unique constraint (hash of
+  the raw payload bytes) rejecting duplicate deliveries before any
+  side effect re-runs, and `PAYMENT_FAILED_WEBHOOK`/
+  `PAYMENT_USER_DROPPED_WEBHOOK` downgrading status with a `.neq(
+  "status", "SUCCESS")` guard so a failure event can never stomp an
+  already-successful payment. Nothing here needed fixing.
+- **Root cause of the actual error, re-confirmed**: `.env.local` still
+  holds *production* Cashfree credentials (`cfsk_ma_prod_...`) and
+  `CASHFREE_API_URL=https://api.cashfree.com/pg` — despite this round's
+  request describing the site as already "configured in Sandbox/Test
+  Mode." It isn't; no sandbox credentials have been provided yet (asked
+  for twice now). Testing from `http://localhost:3000` with production
+  credentials hits the same `return_url must be https` rejection §34
+  already found and verified directly against Cashfree's live API —
+  this is inherent to production credentials + a non-https origin, not
+  fixable from code, and unrelated to sandbox vs. production as a
+  concept (untested whether sandbox is more lenient about this, since
+  no sandbox credentials exist to test with).
+
+**Two real code fixes made, independent of the credentials question:**
+- `src/components/store/checkout/checkout-form.tsx` — removed a static,
+  unconditional "Online payment isn't connected yet…" line left over
+  from before Cashfree was integrated at all (Phase 8). It no longer
+  reflected reality regardless of which environment's credentials were
+  in use, and the request explicitly flagged it. The payment page's own
+  `isCashfreeConfigured()` check (`checkout/pay/[orderId]/page.tsx`)
+  already handles the genuine "nothing configured at all" case
+  correctly and wasn't touched.
+- `src/lib/cashfree/client.ts`'s `createCashfreeOrder` — added
+  structured, secret-free logging (method, URL, order_id, amount,
+  currency, return_url, notify_url before the call; status, cf_order_id,
+  and whether a payment_session_id came back after) so a future failure
+  is diagnosable from Vercel/server logs directly, matching this
+  request's explicit debugging ask, rather than needing another live
+  API investigation from outside the app. Also corrected the file's own
+  top comment, which still claimed "no sandbox credentials in this
+  environment yet... not exercised against a live order" — stale since
+  §34/this section's direct production API verification.
+
+**Cannot be fixed from code, stated plainly rather than assumed away**:
+sandbox credentials do not exist in this environment. Nothing here can
+make Cashfree's API accept them, generate them, or safely emulate them
+— they can only come from logging into the Cashfree dashboard's
+Sandbox/Test mode and copying an App ID + Secret Key from there.

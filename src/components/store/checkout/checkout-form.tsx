@@ -238,8 +238,7 @@ export function CheckoutForm({
           {isPending ? "Placing Order…" : "Place Order"}
         </Button>
         <p className="text-meta mt-3 text-muted-foreground">
-          Online payment isn&apos;t connected yet — your order is recorded and
-          held pending payment; we&apos;ll follow up to complete it.
+          You&apos;ll be redirected to Cashfree to complete payment securely.
         </p>
       </div>
     </form>

@@ -1,12 +1,10 @@
 import "server-only";
 
 // Cashfree Orders API (v2023-08-01) — https://docs.cashfree.com/reference/pg-new-apis-endpoint
-// Written against the documented request/response shape; there are no
-// sandbox credentials in this environment yet (see docs/architecture.md
-// §9), so this has not been exercised against a live Cashfree order.
-// Re-verify field names against the current dashboard/docs the first time
-// real credentials are added, per spec §28 "use the current official
-// Cashfree documentation".
+// Verified working against a real Cashfree production order (200,
+// real payment_session_id returned) — see docs/architecture.md §39.
+// order_meta.return_url must be https; Cashfree's production API
+// rejects anything else outright (confirmed directly, same doc).
 const CASHFREE_API_VERSION = "2023-08-01";
 
 function getConfig() {
@@ -50,9 +48,26 @@ export async function createCashfreeOrder(
 ): Promise<CashfreeOrderSession> {
   const { apiUrl } = getConfig();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const notifyUrl = `${siteUrl}/api/webhooks/cashfree`;
+  const method = "POST";
+  const url = `${apiUrl}/orders`;
 
-  const res = await fetch(`${apiUrl}/orders`, {
-    method: "POST",
+  // Safe by construction — never includes x-client-secret (authHeaders()
+  // is never logged) or any customer PII beyond what's already visible
+  // in the admin order itself. Lets a failure be diagnosed from server
+  // logs alone instead of another blind live-API investigation.
+  console.log("[cashfree] creating order", {
+    method,
+    url,
+    order_id: params.orderId,
+    order_amount: params.amount,
+    order_currency: "INR",
+    return_url: params.returnUrl,
+    notify_url: notifyUrl,
+  });
+
+  const res = await fetch(url, {
+    method,
     headers: authHeaders(),
     body: JSON.stringify({
       order_id: params.orderId,
@@ -65,17 +80,28 @@ export async function createCashfreeOrder(
       },
       order_meta: {
         return_url: params.returnUrl,
-        notify_url: `${siteUrl}/api/webhooks/cashfree`,
+        notify_url: notifyUrl,
       },
     }),
   });
 
   if (!res.ok) {
     const body = await res.text();
+    console.error("[cashfree] order creation failed", {
+      status: res.status,
+      order_id: params.orderId,
+      response: body,
+    });
     throw new Error(`Cashfree order creation failed (${res.status}): ${body}`);
   }
 
   const data = await res.json();
+  console.log("[cashfree] order created", {
+    status: res.status,
+    order_id: params.orderId,
+    cf_order_id: data.cf_order_id,
+    has_payment_session_id: Boolean(data.payment_session_id),
+  });
   return { cfOrderId: data.cf_order_id, paymentSessionId: data.payment_session_id };
 }
 
