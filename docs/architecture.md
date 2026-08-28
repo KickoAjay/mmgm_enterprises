@@ -2008,3 +2008,95 @@ genuinely means no session can be started.
 
 Verified: `pnpm typecheck`, `pnpm lint`, `pnpm test` (40/40), `pnpm
 build` all pass clean after the change.
+
+## 41. Sandbox-vs-Production Credential/URL Mismatch (Real Cause of §40's Recurrence)
+
+After §40's fix shipped, the exact same customer-facing error recurred.
+Live testing (not memory) found the real cause: `CASHFREE_APP_ID` /
+`CASHFREE_SECRET_KEY` and `CASHFREE_API_URL` had drifted out of sync
+twice in a row, in both directions:
+
+- First: sandbox keys (`TEST...` / `cfsk_ma_test_...`) against the
+  production URL (`https://api.cashfree.com/pg`) — confirmed live:
+  `401` against production, `200` against `https://sandbox.cashfree.com/pg`
+  with the same keys. This also confirmed sandbox does **not** require an
+  `https` `return_url` (unlike production, per §34/§39) — a plain
+  `http://localhost:3000/return` returned `200`.
+- Then, switching back to production keys, `CASHFREE_API_URL` was left
+  pointing at the sandbox URL — the identical mismatch, inverted.
+
+**Fix**: `CASHFREE_APP_ID`/`CASHFREE_SECRET_KEY`/`CASHFREE_API_URL` in
+`.env.local` now consistently point at production, with an explanatory
+comment recorded directly in the file (not just here) warning that this
+means every payment session created from now on is real, and that
+Cashfree has no separate "test" mode within production — the pair must
+always move together. `.env.local` is git-ignored (`.gitignore` line 34,
+`.env*`) and confirmed (via `git log --all -p -- .env.local`) to have
+never been committed at any point in this project's history.
+
+## 42. Full Production-Readiness Audit (Cashfree)
+
+A full, fresh (not memory-based) re-inspection of every file in the
+payment path, requested before allowing real customer payments:
+
+- **Order creation** (`src/lib/cashfree/client.ts` `createCashfreeOrder`)
+  — server-only (`import "server-only"`), reads credentials from
+  `process.env` only, never logs the secret key.
+- **Checkout initiation** (`src/components/store/checkout/cashfree-checkout.tsx`)
+  — loads Cashfree's official v3 CDN SDK
+  (`https://sdk.cashfree.com/js/v3/cashfree.js`, no npm package
+  installed — confirmed via `grep -i cashfree package.json`, no match)
+  and calls `window.Cashfree({ mode })` — the exact current v3 syntax.
+  `mode` is computed once, server-side, in `checkout/pay/[orderId]/page.tsx`
+  from `CASHFREE_API_URL` alone (`.includes("sandbox") ? "sandbox" :
+  "production"`) and passed down as a prop — a single source of truth,
+  so frontend/backend mode can't drift apart.
+- **Payment verification**: never trusted client-side. The return page
+  (`checkout/pay/[orderId]/return/page.tsx`) does its own
+  server-to-server `getCashfreeOrder` status check; the webhook
+  (`api/webhooks/cashfree/route.ts`) is the authoritative, always-fires
+  path. Both funnel into the same `confirmPayment()` →
+  `confirm_order_payment` SQL function (`security definer`, row-locks
+  the order and each inventory row, checks `payments.status = 'SUCCESS'`
+  and `orders.status <> 'PENDING_PAYMENT'` before doing anything —
+  reviewed fresh, confirmed idempotent for being called twice on the
+  same order).
+- **Webhook signature verification** (`src/lib/cashfree/webhook.ts`) —
+  HMAC-SHA256 over `timestamp + rawBody` using `CASHFREE_WEBHOOK_SECRET`,
+  compared with `timingSafeEqual`; the route reads `request.text()`
+  (raw bytes) before any `JSON.parse`, required since re-serializing a
+  parsed body can differ byte-for-byte from what was actually signed.
+  Idempotent via a `cashfree_event_id` = `sha256(rawBody)` unique-
+  constrained insert into `payment_transactions` before any side effect
+  runs.
+  **Currently fails closed**: `CASHFREE_WEBHOOK_SECRET` is empty in
+  `.env.local`, so `verifyCashfreeWebhookSignature` returns `false` for
+  every webhook delivery today — safe (nothing is ever wrongly
+  confirmed), but webhook confirmation doesn't function until this is
+  set from the Cashfree dashboard.
+- **Amount trust**: `order.grandTotal` is `orders.grand_total`, written
+  once by `placeOrderAction` from a server-side `calculateOrderTotals()`
+  call over a freshly re-fetched cart (`getCartSummary()`) — never from
+  any client-submitted field. Re-verified against the ₹2,878 → ₹3,022
+  example in `src/features/checkout/pricing.ts`: unchanged since §39.
+- **Order confirmation page** (`checkout/confirmation/[orderId]/page.tsx`)
+  derives "paid" purely from `order.status` read from the database — it
+  is only ever reached via a `redirect()` that itself only fires after
+  server-side confirmation succeeded; there is no path that marks an
+  order paid from a client claim.
+- **No Next.js middleware exists** (`src/lib/db/middleware.ts` is a
+  Supabase session helper, not route middleware — confirmed via
+  `Glob **/middleware.ts`, no root `middleware.ts`), so nothing
+  intercepts or blocks Cashfree's inbound webhook POST.
+- **Git history**: confirmed clean — no `.env*` file and no Cashfree
+  credential has ever been committed (`git log --all -p -- .env
+  .env.local .env.production`, no results).
+
+**Not yet done, cannot be verified from code, must be done manually**:
+`CASHFREE_WEBHOOK_SECRET` needs to be set (locally and in Vercel) from
+the Cashfree dashboard; the two pending migrations from §38
+(`20260822000000_fix_stock_oversell_detection.sql`,
+`20260824000000_add_enquiries.sql`) still need to be confirmed applied
+to the live Supabase project via its SQL Editor — this project has no
+migration runner. Vercel's own `NEXT_PUBLIC_SITE_URL` must be the real
+production `https` domain (cannot be confirmed from this repo alone).
