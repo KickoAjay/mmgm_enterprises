@@ -1,18 +1,40 @@
 import "server-only";
+import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 import { createServiceClient } from "@/lib/db/service";
+import { hasSupabaseAuthSessionFromCookies } from "@/lib/db/auth-cookies";
 
 // Server Component / Server Action only — never import from a Client
 // Component (enforced by the "server-only" import above).
 
-export async function getCurrentUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
-}
+const AUTH_TIMEOUT_MS = 3_000;
+
+export const getCurrentUser = cache(async () => {
+  const cookieStore = await cookies();
+  if (!hasSupabaseAuthSessionFromCookies(cookieStore.getAll())) {
+    return null;
+  }
+
+  try {
+    const supabase = await createClient();
+    const authResult = await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("auth-timeout")), AUTH_TIMEOUT_MS);
+      }),
+    ]);
+    const {
+      data: { user },
+      error,
+    } = authResult;
+    if (error) return null;
+    return user;
+  } catch {
+    return null;
+  }
+});
 
 export async function requireUser() {
   const user = await getCurrentUser();
@@ -45,12 +67,10 @@ export type AdminMembership = {
 // and spec §41 only requires roles + server-side enforcement, not that
 // specific table being populated.
 export async function getAdminMembership(): Promise<AdminMembership | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) return null;
 
+  const supabase = await createClient();
   const { data: membership } = await supabase
     .from("admin_users")
     .select("id, role_id, full_name")

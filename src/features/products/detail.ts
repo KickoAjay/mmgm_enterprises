@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createPublicClient } from "@/lib/db/public";
 import { getAvailabilityMap } from "@/features/products/availability";
 import { getPrimaryImageMap } from "@/features/products/images";
@@ -46,9 +47,9 @@ export type ProductDetail = {
   images: ProductImage[];
 };
 
-export async function getProductDetail(
+export const getProductDetail = cache(async (
   slug: string,
-): Promise<ProductDetail | null> {
+): Promise<ProductDetail | null> => {
   const supabase = createPublicClient();
 
   const { data: product } = await supabase
@@ -181,7 +182,7 @@ export async function getProductDetail(
       altText: img.alt_text,
     })),
   };
-}
+});
 
 export async function getSimilarProducts(
   product: ProductDetail,

@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { createPublicClient } from "@/lib/db/public";
 import type { Database } from "@/types/supabase";
 import { getAvailabilityMap } from "@/features/products/availability";
@@ -135,27 +136,35 @@ async function productIdsForOccasions(
 }
 
 async function getFilterOptions(): Promise<FilterOptions> {
-  const supabase = createPublicClient();
-  const [categories, fabrics, colors, patterns, occasions] = await Promise.all([
-    supabase
-      .from("categories")
-      .select("id, name, slug")
-      .eq("is_active", true)
-      .order("sort_order"),
-    supabase.from("fabrics").select("id, name").order("name"),
-    supabase.from("colors").select("id, name, hex_code").order("name"),
-    supabase.from("patterns").select("id, name").order("name"),
-    supabase.from("occasions").select("id, name").order("name"),
-  ]);
-
-  return {
-    categories: categories.data ?? [],
-    fabrics: fabrics.data ?? [],
-    colors: colors.data ?? [],
-    patterns: patterns.data ?? [],
-    occasions: occasions.data ?? [],
-  };
+  return loadFilterOptions();
 }
+
+const loadFilterOptions = unstable_cache(
+  async (): Promise<FilterOptions> => {
+    const supabase = createPublicClient();
+    const [categories, fabrics, colors, patterns, occasions] = await Promise.all([
+      supabase
+        .from("categories")
+        .select("id, name, slug")
+        .eq("is_active", true)
+        .order("sort_order"),
+      supabase.from("fabrics").select("id, name").order("name"),
+      supabase.from("colors").select("id, name, hex_code").order("name"),
+      supabase.from("patterns").select("id, name").order("name"),
+      supabase.from("occasions").select("id, name").order("name"),
+    ]);
+
+    return {
+      categories: categories.data ?? [],
+      fabrics: fabrics.data ?? [],
+      colors: colors.data ?? [],
+      patterns: patterns.data ?? [],
+      occasions: occasions.data ?? [],
+    };
+  },
+  ["catalog-filter-options"],
+  { revalidate: 300 },
+);
 
 export async function getCatalogPage(
   params: CatalogSearchParams,

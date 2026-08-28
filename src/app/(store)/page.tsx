@@ -4,23 +4,16 @@ import { ProductCarousel } from "@/components/store/product-carousel";
 import { ProductGrid } from "@/components/store/home/product-grid";
 import { EditorialBanner } from "@/components/store/home/editorial-banner";
 import { OffersSection } from "@/components/store/home/offers-section";
-import {
-  getTrendingNow,
-  getNewArrivals,
-  getBestSellers,
-} from "@/features/products/queries";
+import { getHomepageData } from "@/features/products/queries";
 
 export default async function Home() {
-  const [trending, newArrivals, bestSellers] = await Promise.all([
-    getTrendingNow(),
-    getNewArrivals(),
-    getBestSellers(),
-  ]);
+  const { trending, newArrivals, bestSellers, categories } =
+    await getHomepageData();
 
   return (
     <main>
       <HeroBanner />
-      <ShopByCategory />
+      <ShopByCategory categories={categories} />
 
       <ProductCarousel title="Trending Now" products={trending} />
 

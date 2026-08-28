@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/db/server";
+import { createAuthActionClient } from "@/lib/db/auth-action-client";
 import {
   registerSchema,
   loginSchema,
@@ -39,7 +39,7 @@ export async function signUpAction(
   if (!allowed) return { error: TOO_MANY_ATTEMPTS };
 
   const { fullName, email, mobile, password } = parsed.data;
-  const supabase = await createClient();
+  const supabase = await createAuthActionClient();
   const { error } = await supabase.auth.signUp({
     email,
     password,
@@ -69,9 +69,17 @@ export async function signInAction(
   const { allowed } = checkRateLimit(`login:${ip}`, { limit: 10, windowMs: 15 * 60 * 1000 });
   if (!allowed) return { error: TOO_MANY_ATTEMPTS };
 
-  const supabase = await createClient();
+  const supabase = await createAuthActionClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) return { error: "Invalid email or password" };
+  if (error) {
+    if (error.message.toLowerCase().includes("abort")) {
+      return {
+        error:
+          "Login is taking too long. Please try again in a moment or contact support if this continues.",
+      };
+    }
+    return { error: "Invalid email or password" };
+  }
 
   // Admin-disabled accounts (Phase 11 "Enable/Disable Account", spec §39)
   // authenticate fine against Supabase Auth — is_active lives in our own
@@ -114,7 +122,7 @@ export async function signInAction(
 }
 
 export async function signOutAction() {
-  const supabase = await createClient();
+  const supabase = await createAuthActionClient();
   await supabase.auth.signOut();
   redirect("/");
 }
@@ -132,7 +140,7 @@ export async function requestPasswordResetAction(
   const { allowed } = checkRateLimit(`reset:${ip}`, { limit: 5, windowMs: 60 * 60 * 1000 });
   if (!allowed) return { error: TOO_MANY_ATTEMPTS };
 
-  const supabase = await createClient();
+  const supabase = await createAuthActionClient();
   const { error } = await supabase.auth.resetPasswordForEmail(
     parsed.data.email,
     { redirectTo: `${siteUrl}/auth/callback?next=/reset-password` },
@@ -165,7 +173,7 @@ export async function updatePasswordAction(
   });
   if (!allowed) return { error: TOO_MANY_ATTEMPTS };
 
-  const supabase = await createClient();
+  const supabase = await createAuthActionClient();
   const { error } = await supabase.auth.updateUser({
     password: parsed.data.password,
   });
@@ -189,7 +197,7 @@ export async function resendVerificationEmailAction(
   const { allowed } = checkRateLimit(`resend:${ip}`, { limit: 5, windowMs: 60 * 60 * 1000 });
   if (!allowed) return { error: TOO_MANY_ATTEMPTS };
 
-  const supabase = await createClient();
+  const supabase = await createAuthActionClient();
   const { error } = await supabase.auth.resend({
     type: "signup",
     email,

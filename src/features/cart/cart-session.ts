@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/db/server";
 import { createServiceClient } from "@/lib/db/service";
 import { getCurrentUser } from "@/lib/auth/session";
+import { hasSupabaseAuthSessionFromCookies } from "@/lib/db/auth-cookies";
 import type { Database } from "@/types/supabase";
 
 const CART_COOKIE = "mmgm_cart_session";
@@ -19,7 +20,26 @@ export type CartContext = {
 // Guest carts have no auth.uid() for RLS to check, so they go through the
 // service-role client instead (deliberate, narrow exception — see
 // docs/architecture.md §7/§19 for the same pattern with inventory reads).
+async function resolveGuestCart(): Promise<CartContext> {
+  const supabase = createServiceClient();
+  const cookieStore = await cookies();
+  const sessionId = cookieStore.get(CART_COOKIE)?.value;
+  if (!sessionId) return { cartId: null, supabase };
+
+  const { data } = await supabase
+    .from("carts")
+    .select("id")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+  return { cartId: data?.id ?? null, supabase };
+}
+
 async function resolveCartId(): Promise<CartContext> {
+  const cookieStore = await cookies();
+  if (!hasSupabaseAuthSessionFromCookies(cookieStore.getAll())) {
+    return resolveGuestCart();
+  }
+
   const user = await getCurrentUser();
 
   if (user) {
@@ -32,17 +52,7 @@ async function resolveCartId(): Promise<CartContext> {
     return { cartId: data?.id ?? null, supabase };
   }
 
-  const supabase = createServiceClient();
-  const cookieStore = await cookies();
-  const sessionId = cookieStore.get(CART_COOKIE)?.value;
-  if (!sessionId) return { cartId: null, supabase };
-
-  const { data } = await supabase
-    .from("carts")
-    .select("id")
-    .eq("session_id", sessionId)
-    .maybeSingle();
-  return { cartId: data?.id ?? null, supabase };
+  return resolveGuestCart();
 }
 
 // Read-only — safe to call from a Server Component render. Never creates a

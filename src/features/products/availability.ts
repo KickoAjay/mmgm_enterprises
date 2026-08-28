@@ -2,6 +2,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 
+const AVAILABILITY_TIMEOUT_MS = 5_000;
+
 // Shared by the catalog (Phase 4) and cart (Phase 6) — the only
 // public-facing read of stock status, routed through the SECURITY DEFINER
 // `get_product_availability` RPC rather than selecting from `inventory`
@@ -14,9 +16,23 @@ export async function getAvailabilityMap(
   productIds: string[],
 ): Promise<Map<string, boolean>> {
   if (productIds.length === 0) return new Map();
-  const { data, error } = await supabase.rpc("get_product_availability", {
-    p_product_ids: productIds,
-  });
-  if (error) throw error;
-  return new Map((data ?? []).map((row) => [row.product_id, row.is_available]));
+
+  try {
+    const { data, error } = await Promise.race([
+      supabase.rpc("get_product_availability", {
+        p_product_ids: productIds,
+      }),
+      new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error("availability-timeout")),
+          AVAILABILITY_TIMEOUT_MS,
+        );
+      }),
+    ]);
+    if (error) throw error;
+    return new Map((data ?? []).map((row) => [row.product_id, row.is_available]));
+  } catch {
+    // Fail open: a slow/unreachable stock RPC must not block the catalog.
+    return new Map(productIds.map((id) => [id, true]));
+  }
 }

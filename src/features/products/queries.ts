@@ -1,5 +1,7 @@
 import "server-only";
-import { createClient } from "@/lib/db/server";
+import { unstable_cache } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createPublicClient } from "@/lib/db/public";
 import { getPrimaryImageMap } from "@/features/products/images";
 import type { Database } from "@/types/supabase";
 
@@ -9,18 +11,19 @@ export type ProductListItem = ProductRow & {
   imageUrl: string | null;
 };
 
-// Homepage sections only need the fabric's name — this does a second
-// lookup query instead of `.select("*, fabrics(name)")`, since embedded
-// foreign-table selects need relationship metadata this hand-maintained
-// Database type doesn't model. Revisit once generated types are available.
-// Also attaches each product's primary image (getPrimaryImageMap) so
-// ProductCard can render a real photo instead of MediaPlaceholder.
-async function withFabricNames(
+type CategoryTile = {
+  id: string;
+  name: string;
+  slug: string;
+  image_url: string | null;
+};
+
+async function enrichProducts(
+  supabase: SupabaseClient<Database>,
   products: ProductRow[],
 ): Promise<ProductListItem[]> {
   if (products.length === 0) return [];
 
-  const supabase = await createClient();
   const fabricIds = [
     ...new Set(
       products
@@ -49,8 +52,19 @@ async function withFabricNames(
   }));
 }
 
+function dedupeProducts(products: ProductRow[]): ProductRow[] {
+  const seen = new Set<string>();
+  const unique: ProductRow[] = [];
+  for (const product of products) {
+    if (seen.has(product.id)) continue;
+    seen.add(product.id);
+    unique.push(product);
+  }
+  return unique;
+}
+
 export async function getNewArrivals(limit = 8): Promise<ProductListItem[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("products")
     .select("*")
@@ -58,14 +72,11 @@ export async function getNewArrivals(limit = 8): Promise<ProductListItem[]> {
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return withFabricNames(data ?? []);
+  return enrichProducts(supabase, data ?? []);
 }
 
-// No real order history yet, so "best selling" / "trending" fall back to
-// rating/recency ordering — both are 0/tied across the seeded catalog
-// until real reviews and sales exist (Phase 9/10 onward).
 export async function getBestSellers(limit = 8): Promise<ProductListItem[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("products")
     .select("*")
@@ -74,11 +85,11 @@ export async function getBestSellers(limit = 8): Promise<ProductListItem[]> {
     .order("avg_rating", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return withFabricNames(data ?? []);
+  return enrichProducts(supabase, data ?? []);
 }
 
 export async function getTrendingNow(limit = 10): Promise<ProductListItem[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("products")
     .select("*")
@@ -87,20 +98,13 @@ export async function getTrendingNow(limit = 10): Promise<ProductListItem[]> {
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return withFabricNames(data ?? []);
+  return enrichProducts(supabase, data ?? []);
 }
-
-type CategoryTile = {
-  id: string;
-  name: string;
-  slug: string;
-  image_url: string | null;
-};
 
 export async function getShopByCategoryTiles(
   limit = 8,
 ): Promise<CategoryTile[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("categories")
     .select("id, name, slug, image_url")
@@ -109,4 +113,79 @@ export async function getShopByCategoryTiles(
     .limit(limit);
   if (error) throw error;
   return data ?? [];
+}
+
+export type HomepageData = {
+  trending: ProductListItem[];
+  newArrivals: ProductListItem[];
+  bestSellers: ProductListItem[];
+  categories: CategoryTile[];
+};
+
+// One round-trip batch for the homepage instead of 9+ separate queries.
+const loadHomepageData = unstable_cache(
+  async (): Promise<HomepageData> => {
+    const supabase = createPublicClient();
+
+    const [trendingRes, newArrivalsRes, bestSellersRes, categoriesRes] =
+      await Promise.all([
+        supabase
+          .from("products")
+          .select("*")
+          .eq("status", "ACTIVE")
+          .order("avg_rating", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(10),
+        supabase
+          .from("products")
+          .select("*")
+          .eq("status", "ACTIVE")
+          .order("created_at", { ascending: false })
+          .limit(8),
+        supabase
+          .from("products")
+          .select("*")
+          .eq("status", "ACTIVE")
+          .order("review_count", { ascending: false })
+          .order("avg_rating", { ascending: false })
+          .limit(8),
+        supabase
+          .from("categories")
+          .select("id, name, slug, image_url")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true })
+          .limit(8),
+      ]);
+
+    if (trendingRes.error) throw trendingRes.error;
+    if (newArrivalsRes.error) throw newArrivalsRes.error;
+    if (bestSellersRes.error) throw bestSellersRes.error;
+    if (categoriesRes.error) throw categoriesRes.error;
+
+    const allRows = dedupeProducts([
+      ...(trendingRes.data ?? []),
+      ...(newArrivalsRes.data ?? []),
+      ...(bestSellersRes.data ?? []),
+    ]);
+    const enriched = await enrichProducts(supabase, allRows);
+    const enrichedMap = new Map(enriched.map((p) => [p.id, p]));
+
+    const mapList = (rows: ProductRow[]) =>
+      rows
+        .map((row) => enrichedMap.get(row.id))
+        .filter((p): p is ProductListItem => p !== undefined);
+
+    return {
+      trending: mapList(trendingRes.data ?? []),
+      newArrivals: mapList(newArrivalsRes.data ?? []),
+      bestSellers: mapList(bestSellersRes.data ?? []),
+      categories: categoriesRes.data ?? [],
+    };
+  },
+  ["homepage-data"],
+  { revalidate: 60 },
+);
+
+export async function getHomepageData(): Promise<HomepageData> {
+  return loadHomepageData();
 }
