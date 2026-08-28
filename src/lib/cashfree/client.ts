@@ -22,6 +22,7 @@ export type CreateCashfreeOrderParams = {
   orderId: string; // sent as Cashfree's own order_id — our orders.order_number
   amount: number;
   customerId: string;
+  customerName: string;
   customerEmail: string;
   customerPhone: string;
   returnUrl: string;
@@ -64,6 +65,7 @@ export async function createCashfreeOrder(
       order_currency: "INR",
       customer_details: {
         customer_id: params.customerId,
+        customer_name: params.customerName,
         customer_email: params.customerEmail,
         customer_phone: params.customerPhone,
       },

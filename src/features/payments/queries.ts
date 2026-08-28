@@ -8,6 +8,7 @@ export type PaymentOrder = {
   paymentStatus: string;
   cashfreeOrderId: string | null;
   grandTotal: number;
+  customerName: string;
   customerEmail: string;
   customerPhone: string;
 };
@@ -33,7 +34,7 @@ export async function getOrderForPayment(
     order.shipping_address_id
       ? supabase
           .from("addresses")
-          .select("phone")
+          .select("phone, full_name")
           .eq("id", order.shipping_address_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -50,6 +51,7 @@ export async function getOrderForPayment(
     paymentStatus: payment.status,
     cashfreeOrderId: payment.cashfree_order_id,
     grandTotal: order.grand_total,
+    customerName: addressResult.data?.full_name ?? "Customer",
     customerEmail: order.guest_email ?? userResult.data?.email ?? "",
     customerPhone: order.guest_phone ?? addressResult.data?.phone ?? "",
   };

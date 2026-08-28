@@ -2,14 +2,12 @@ import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getOrderForPayment } from "@/features/payments/queries";
 import {
-  createCashfreeOrder,
   getCashfreeOrder,
-  getCashfreeConfig,
   getConfiguredSiteUrl,
   getProductionCheckoutBlockReason,
   isCashfreeConfigured,
-  type CashfreeOrder,
 } from "@/lib/cashfree/client";
+import { ensureCashfreePaymentSession } from "@/lib/cashfree/session";
 import { CashfreeCheckout } from "@/components/store/checkout/cashfree-checkout";
 import { formatINR } from "@/features/products/format";
 
@@ -43,23 +41,48 @@ export default async function PaymentPage({
     );
   }
 
-  let existing: CashfreeOrder | null = null;
   if (order.cashfreeOrderId) {
-    existing = await getCashfreeOrder(order.cashfreeOrderId);
+    const existing = await getCashfreeOrder(order.cashfreeOrderId);
+    if (existing?.orderStatus === "PAID") {
+      redirect(`/checkout/pay/${order.id}/return`);
+    }
   }
 
-  if (existing?.orderStatus === "PAID") {
-    redirect(`/checkout/pay/${order.id}/return`);
-  }
-
-  const { mode } = getCashfreeConfig();
   const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
   const protocol = headerStore.get("x-forwarded-proto") ?? "http";
   const requestOrigin = host ? `${protocol}://${host}` : null;
+  const siteUrl = getConfiguredSiteUrl();
+  const returnUrl = `${siteUrl}/checkout/pay/${order.id}/return`;
+
+  let paymentSessionId: string | null = null;
+  let checkoutMode: "sandbox" | "production" = "production";
+  let fetchFailed = false;
+  let fetchError: string | null = null;
+
+  try {
+    const session = await ensureCashfreePaymentSession({
+      dbOrderId: order.id,
+      cashfreeOrderId: order.cashfreeOrderId ?? order.orderNumber,
+      orderNumber: order.orderNumber,
+      amount: order.grandTotal,
+      customerId: order.id,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      customerPhone: order.customerPhone,
+      returnUrl,
+    });
+    paymentSessionId = session.paymentSessionId;
+    checkoutMode = session.mode;
+  } catch (err) {
+    console.error(`Cashfree order creation failed for order ${order.id}:`, err);
+    fetchFailed = true;
+    fetchError = err instanceof Error ? err.message : null;
+  }
+
   const productionBlockReason = getProductionCheckoutBlockReason(
     requestOrigin,
-    mode,
+    checkoutMode,
   );
 
   if (productionBlockReason) {
@@ -85,32 +108,6 @@ export default async function PaymentPage({
     );
   }
 
-  const siteUrl = getConfiguredSiteUrl();
-
-  let paymentSessionId: string | null = null;
-  let fetchFailed = false;
-  if (
-    existing?.paymentSessionId &&
-    (existing.orderStatus === "ACTIVE" || existing.orderStatus === "PENDING")
-  ) {
-    paymentSessionId = existing.paymentSessionId;
-  } else {
-    try {
-      const created = await createCashfreeOrder({
-        orderId: order.cashfreeOrderId ?? order.orderNumber,
-        amount: order.grandTotal,
-        customerId: order.id,
-        customerEmail: order.customerEmail,
-        customerPhone: order.customerPhone,
-        returnUrl: `${siteUrl}/checkout/pay/${order.id}/return`,
-      });
-      paymentSessionId = created.paymentSessionId;
-    } catch (err) {
-      console.error(`Cashfree order creation failed for order ${order.id}:`, err);
-      fetchFailed = true;
-    }
-  }
-
   if (fetchFailed || !paymentSessionId) {
     return (
       <main className="mx-auto max-w-lg px-6 py-16 text-center">
@@ -118,6 +115,9 @@ export default async function PaymentPage({
         <p className="mt-4 text-sm text-destructive">
           We couldn&apos;t start the payment session. Please try again.
         </p>
+        {fetchError ? (
+          <p className="mt-2 text-xs text-muted-foreground">{fetchError}</p>
+        ) : null}
         <a
           href={`/checkout/pay/${order.id}`}
           className="mt-4 inline-block text-sm text-primary underline-offset-4 hover:underline"
@@ -136,8 +136,7 @@ export default async function PaymentPage({
       </p>
       <CashfreeCheckout
         paymentSessionId={paymentSessionId}
-        mode={mode}
-        returnUrl={`${siteUrl}/checkout/pay/${order.id}/return`}
+        mode={checkoutMode}
         productionSiteUrl={getConfiguredSiteUrl()}
       />
     </main>
