@@ -64,6 +64,17 @@ export function isCashfreeConfigured(): boolean {
   );
 }
 
+// Cashfree signs webhooks with the Payment Gateway secret key — there is no
+// separate webhook secret in the dashboard. CASHFREE_WEBHOOK_SECRET is an
+// optional override; when unset we use CASHFREE_SECRET_KEY.
+export function getCashfreeWebhookSecret(): string | null {
+  return (
+    process.env.CASHFREE_WEBHOOK_SECRET?.trim() ||
+    process.env.CASHFREE_SECRET_KEY?.trim() ||
+    null
+  );
+}
+
 export function getConfiguredSiteUrl(): string {
   return getSiteUrl();
 }

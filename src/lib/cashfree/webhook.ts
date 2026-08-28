@@ -1,5 +1,6 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { getCashfreeWebhookSecret } from "@/lib/cashfree/config";
 
 // Cashfree webhook signature: base64(HMAC-SHA256(timestamp + rawBody, secret)),
 // sent as `x-webhook-signature` alongside `x-webhook-timestamp`. Must be
@@ -12,7 +13,7 @@ export function verifyCashfreeWebhookSignature(params: {
   timestamp: string;
   signature: string;
 }): boolean {
-  const secret = process.env.CASHFREE_WEBHOOK_SECRET;
+  const secret = getCashfreeWebhookSecret();
   if (!secret) return false;
 
   const expected = createHmac("sha256", secret)

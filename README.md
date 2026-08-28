@@ -35,7 +35,7 @@ Copy `.env.example` to `.env.local` and fill in:
 | `SUPABASE_SERVICE_ROLE_KEY` | Guest checkout, webhooks, admin bootstrap | **Secret** — server-only, never exposed to the browser |
 | `CASHFREE_APP_ID` / `CASHFREE_SECRET_KEY` | Checkout | From the Cashfree dashboard (sandbox or production) |
 | `CASHFREE_API_URL` | Checkout | `https://sandbox.cashfree.com/pg` or the production equivalent |
-| `CASHFREE_WEBHOOK_SECRET` | Payment confirmation | Configured alongside the webhook URL in the Cashfree dashboard |
+| `CASHFREE_WEBHOOK_SECRET` | Payment confirmation | Optional — defaults to `CASHFREE_SECRET_KEY` (Cashfree uses the same PG secret for webhook signatures) |
 | `RESEND_API_KEY` | Transactional email | From resend.com |
 | `EMAIL_FROM` | Transactional email | Must be a verified sender/domain in Resend |
 | `ADMIN_NOTIFICATION_EMAIL` | Admin new-order alerts | Optional — leave unset to skip that email |
@@ -82,7 +82,7 @@ There's no seeded admin. Register a normal account at `/register`, then sign in 
 1. Import the repo into Vercel — it's a standard Next.js project, no extra build configuration needed.
 2. Set every variable from [Environment variables](#environment-variables) above in the Vercel project settings (Production + Preview as appropriate).
 3. Point `NEXT_PUBLIC_SITE_URL` at the real production domain.
-4. In the Cashfree dashboard, set the webhook URL to `https://<your-domain>/api/webhooks/cashfree` and put the matching secret in `CASHFREE_WEBHOOK_SECRET`.
+4. In the Cashfree dashboard, set the webhook URL to `https://<your-domain>/api/webhooks/cashfree`. Webhook signatures use `CASHFREE_SECRET_KEY` automatically — `CASHFREE_WEBHOOK_SECRET` is only needed if you want to override that.
 5. In Resend, verify the sending domain (resend.com/domains) and update `EMAIL_FROM` to use it — until then, Resend's sandbox sender only delivers to the Resend account's own registered address.
 6. Run the Supabase migrations (see above) against the production project before the first deploy.
 
