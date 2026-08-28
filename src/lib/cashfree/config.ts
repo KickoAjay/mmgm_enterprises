@@ -80,7 +80,12 @@ export function getProductionCheckoutBlockReason(
   requestOrigin: string | null,
   mode: "sandbox" | "production",
 ): string | null {
-  if (mode === "sandbox" || !requestOrigin) return null;
+  if (mode === "sandbox" || !requestOrigin) {
+    if (mode === "production" && !requestOrigin) {
+      return `Cannot verify where checkout was opened. For production payments, open ${getConfiguredSiteUrl()} directly instead of localhost.`;
+    }
+    return null;
+  }
 
   try {
     const url = new URL(requestOrigin);

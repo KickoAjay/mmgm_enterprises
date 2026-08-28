@@ -131,7 +131,11 @@ export default async function PaymentPage({
       <p className="mt-2 text-sm text-muted-foreground">
         Order {order.orderNumber} — {formatINR(order.grandTotal)}
       </p>
-      <CashfreeCheckout paymentSessionId={paymentSessionId} mode={mode} />
+      <CashfreeCheckout
+        paymentSessionId={paymentSessionId}
+        mode={mode}
+        productionSiteUrl={getConfiguredSiteUrl()}
+      />
     </main>
   );
 }
