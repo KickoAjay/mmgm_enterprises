@@ -89,7 +89,10 @@ export default async function PaymentPage({
 
   let paymentSessionId: string | null = null;
   let fetchFailed = false;
-  if (existing?.paymentSessionId && existing.orderStatus === "ACTIVE") {
+  if (
+    existing?.paymentSessionId &&
+    (existing.orderStatus === "ACTIVE" || existing.orderStatus === "PENDING")
+  ) {
     paymentSessionId = existing.paymentSessionId;
   } else {
     try {
@@ -134,6 +137,7 @@ export default async function PaymentPage({
       <CashfreeCheckout
         paymentSessionId={paymentSessionId}
         mode={mode}
+        returnUrl={`${siteUrl}/checkout/pay/${order.id}/return`}
         productionSiteUrl={getConfiguredSiteUrl()}
       />
     </main>

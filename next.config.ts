@@ -15,11 +15,13 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https://*.supabase.co https://images.pexels.com",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co https://*.cashfree.com",
+  "connect-src 'self' https://*.supabase.co https://*.cashfree.com https://sdk.cashfree.com",
   "frame-src https://*.cashfree.com",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  // Cashfree hosted checkout posts/navigates to *.cashfree.com — 'self' only
+  // blocks that and leaves the page stuck on "Redirecting…" with no error.
+  "form-action 'self' https://*.cashfree.com",
   "frame-ancestors 'none'",
 ].join("; ");
 
