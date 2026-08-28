@@ -1,8 +1,12 @@
 import { notFound, redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getOrderForPayment } from "@/features/payments/queries";
 import {
   createCashfreeOrder,
   getCashfreeOrder,
+  getCashfreeConfig,
+  getConfiguredSiteUrl,
+  getProductionCheckoutBlockReason,
   isCashfreeConfigured,
   type CashfreeOrder,
 } from "@/lib/cashfree/client";
@@ -40,32 +44,48 @@ export default async function PaymentPage({
   }
 
   let existing: CashfreeOrder | null = null;
-  try {
-    existing = order.cashfreeOrderId
-      ? await getCashfreeOrder(order.cashfreeOrderId)
-      : null;
-  } catch (err) {
-    // Best-effort resume check only — used solely to reuse an in-progress
-    // session instead of creating a duplicate one. A failure here (a stale
-    // cashfree_order_id recorded before any real Cashfree order existed
-    // under the current credentials, a transient network error, etc.)
-    // must NOT block the customer: fall through and create a fresh order
-    // below instead. Previously this set fetchFailed and aborted the whole
-    // page even though order creation itself works fine — verified live.
-    console.error(
-      `Cashfree order lookup failed for order ${order.id}, creating a fresh session instead:`,
-      err,
-    );
+  if (order.cashfreeOrderId) {
+    existing = await getCashfreeOrder(order.cashfreeOrderId);
   }
 
   if (existing?.orderStatus === "PAID") {
     redirect(`/checkout/pay/${order.id}/return`);
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const mode = (process.env.CASHFREE_API_URL ?? "").includes("sandbox")
-    ? "sandbox"
-    : "production";
+  const { mode } = getCashfreeConfig();
+  const headerStore = await headers();
+  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
+  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
+  const requestOrigin = host ? `${protocol}://${host}` : null;
+  const productionBlockReason = getProductionCheckoutBlockReason(
+    requestOrigin,
+    mode,
+  );
+
+  if (productionBlockReason) {
+    return (
+      <main className="mx-auto max-w-lg px-6 py-16 text-center">
+        <h1 className="font-serif text-section text-foreground">Complete Payment</h1>
+        <p className="mt-4 text-sm text-muted-foreground">
+          Order {order.orderNumber} — {formatINR(order.grandTotal)}
+        </p>
+        <p className="mt-4 text-sm text-destructive">{productionBlockReason}</p>
+        <p className="mt-4 text-sm text-muted-foreground">
+          For local testing, switch back to Cashfree <strong>sandbox/test keys</strong>.
+          For real payments, use{" "}
+          <a
+            href={getConfiguredSiteUrl()}
+            className="text-primary underline-offset-4 hover:underline"
+          >
+            {getConfiguredSiteUrl()}
+          </a>
+          .
+        </p>
+      </main>
+    );
+  }
+
+  const siteUrl = getConfiguredSiteUrl();
 
   let paymentSessionId: string | null = null;
   let fetchFailed = false;

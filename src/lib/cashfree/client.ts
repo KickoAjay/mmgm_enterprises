@@ -1,4 +1,5 @@
 import "server-only";
+import { getCashfreeConfig, getConfiguredSiteUrl } from "@/lib/cashfree/config";
 
 // Cashfree Orders API (v2023-08-01) — https://docs.cashfree.com/reference/pg-new-apis-endpoint
 // Verified working against a real Cashfree production order (200,
@@ -7,20 +8,8 @@ import "server-only";
 // rejects anything else outright (confirmed directly, same doc).
 const CASHFREE_API_VERSION = "2023-08-01";
 
-function getConfig() {
-  const appId = process.env.CASHFREE_APP_ID;
-  const secretKey = process.env.CASHFREE_SECRET_KEY;
-  const apiUrl = process.env.CASHFREE_API_URL;
-  if (!appId || !secretKey || !apiUrl) {
-    throw new Error(
-      "Cashfree is not configured — set CASHFREE_APP_ID, CASHFREE_SECRET_KEY, and CASHFREE_API_URL in .env.local",
-    );
-  }
-  return { appId, secretKey, apiUrl };
-}
-
 function authHeaders(): Record<string, string> {
-  const { appId, secretKey } = getConfig();
+  const { appId, secretKey } = getCashfreeConfig();
   return {
     "x-client-id": appId,
     "x-client-secret": secretKey,
@@ -46,8 +35,8 @@ export type CashfreeOrderSession = {
 export async function createCashfreeOrder(
   params: CreateCashfreeOrderParams,
 ): Promise<CashfreeOrderSession> {
-  const { apiUrl } = getConfig();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const { apiUrl } = getCashfreeConfig();
+  const siteUrl = getConfiguredSiteUrl();
   const notifyUrl = `${siteUrl}/api/webhooks/cashfree`;
   const method = "POST";
   const url = `${apiUrl}/orders`;
@@ -116,16 +105,26 @@ export type CashfreeOrder = {
 // for the same order_number on page refresh) and, on the return page, as
 // the immediate best-effort confirmation. Never trust the return
 // redirect's query params alone (spec §56.7); this hits Cashfree directly.
-// Returns null for a 404 (no Cashfree order created yet).
+// Returns null when no resumable session exists (404), or when lookup
+// cannot authenticate (401 — wrong credentials/URL or a stale order_id
+// from a different Cashfree environment).
 export async function getCashfreeOrder(
   cashfreeOrderId: string,
 ): Promise<CashfreeOrder | null> {
-  const { apiUrl } = getConfig();
+  const { apiUrl } = getCashfreeConfig();
   const res = await fetch(`${apiUrl}/orders/${encodeURIComponent(cashfreeOrderId)}`, {
     headers: authHeaders(),
     cache: "no-store",
   });
-  if (res.status === 404) return null;
+  if (res.status === 404 || res.status === 401) {
+    if (res.status === 401) {
+      console.warn(
+        "[cashfree] order lookup returned 401 — no resumable session under current credentials",
+        { cashfreeOrderId, apiUrl },
+      );
+    }
+    return null;
+  }
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Cashfree order lookup failed (${res.status}): ${body}`);
@@ -137,10 +136,4 @@ export async function getCashfreeOrder(
   };
 }
 
-export function isCashfreeConfigured(): boolean {
-  return Boolean(
-    process.env.CASHFREE_APP_ID &&
-      process.env.CASHFREE_SECRET_KEY &&
-      process.env.CASHFREE_API_URL,
-  );
-}
+export { isCashfreeConfigured, getCashfreeConfig, getConfiguredSiteUrl, getProductionCheckoutBlockReason } from "@/lib/cashfree/config";
